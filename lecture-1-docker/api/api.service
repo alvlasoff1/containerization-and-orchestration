@@ -1,0 +1,25 @@
+# Part 1 baseline: run `api` as a plain host process, no isolation.
+# Install:
+#   sudo cp api-linux-amd64 /usr/local/bin/api   # or api-linux-arm64
+#   sudo cp api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now api
+# Then: curl localhost:8080/health ; systemctl status api ; ps -o pid,comm -C api
+#
+# Note: NO resource limits here on purpose. systemd manages a cgroup v2 for this
+# unit, so MemoryMax=/CPUQuota=/TasksMax= are exactly the Part 3 mechanism — we
+# add them there by hand so the connection is visible.
+
+[Unit]
+Description=api service (lab 1 under-test service)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/api
+Environment=PORT=8080
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
