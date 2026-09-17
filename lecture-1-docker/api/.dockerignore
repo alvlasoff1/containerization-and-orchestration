@@ -1,0 +1,5 @@
+# Keep the build context small: source only, no prebuilt binaries.
+api
+api-linux-amd64
+api-linux-arm64
+api.service

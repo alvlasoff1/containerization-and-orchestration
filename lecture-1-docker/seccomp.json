@@ -1,0 +1,26 @@
+{
+  "comment": "Part 4/5 seccomp profile for the api service. Default-allow, with the clock/time-setting syscalls trapped (SIGSYS). Mirrors the blocklist compiled into mydocker.sh; also usable directly with `docker run --security-opt seccomp=seccomp.json`.",
+  "defaultAction": "SCMP_ACT_ALLOW",
+  "archMap": [
+    {
+      "architecture": "SCMP_ARCH_X86_64",
+      "subArchitectures": ["SCMP_ARCH_X86", "SCMP_ARCH_X32"]
+    },
+    {
+      "architecture": "SCMP_ARCH_AARCH64",
+      "subArchitectures": ["SCMP_ARCH_ARM"]
+    }
+  ],
+  "syscalls": [
+    {
+      "names": [
+        "settimeofday",
+        "clock_settime",
+        "clock_adjtime",
+        "adjtimex"
+      ],
+      "action": "SCMP_ACT_TRAP",
+      "comment": "Block changing the system clock. Trapping delivers SIGSYS to the caller."
+    }
+  ]
+}
