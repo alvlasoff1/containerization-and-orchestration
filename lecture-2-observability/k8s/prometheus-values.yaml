@@ -1,0 +1,18 @@
+
+extraScrapeConfigs: |
+  - job_name: api
+    metrics_path: /metrics
+    scrape_interval: 15s
+    static_configs:
+      - targets:
+          - api.lab2-observability.svc.cluster.local:8080
+        labels:
+          service: api
+
+server:
+  persistentVolume:
+    enabled: false
+alertmanager:
+  enabled: false
+prometheus-pushgateway:
+  enabled: false

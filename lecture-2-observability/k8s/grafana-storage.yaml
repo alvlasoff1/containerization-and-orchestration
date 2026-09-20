@@ -1,0 +1,31 @@
+# Node-local storage for Grafana: a hostPath PV bound statically to a PVC.
+# Data lives in /data/grafana on the node the pod runs on. On a single-node
+# local cluster that's fine; on minikube /data survives cluster restarts.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: grafana-hostpath
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""          # no dynamic provisioner; bound by volumeName below
+  hostPath:
+    path: /data/grafana
+    type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-hostpath
+  namespace: lab2-observability
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ""
+  volumeName: grafana-hostpath  # binds to the PV above
+  resources:
+    requests:
+      storage: 2Gi

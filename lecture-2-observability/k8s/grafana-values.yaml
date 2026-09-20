@@ -1,0 +1,27 @@
+
+adminUser: admin
+adminPassword: admin
+
+service:
+  type: NodePort
+  nodePort: 30030    # UI at http://<NodeIP>:30030 (NodePort range 30000-32767)
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus-server.lab2-observability.svc.cluster.local
+        isDefault: true
+
+persistence:
+  enabled: true
+  type: pvc
+  existingClaim: grafana-hostpath   # the hostPath PVC from grafana-storage.yaml
+
+# The chart's init container chowns the volume to Grafana's uid (472) so the
+# hostPath dir is writable. Enabled by default; kept explicit here.
+initChownData:
+  enabled: true
