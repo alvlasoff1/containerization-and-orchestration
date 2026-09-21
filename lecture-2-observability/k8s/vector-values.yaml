@@ -1,0 +1,49 @@
+# Values for the vector chart (helm.vector.dev) — Agent role = DaemonSet,
+# one pod per node. The chart mounts /var/log and the container log dir and
+# creates the RBAC Vector needs to read pod metadata from the API server.
+
+role: Agent
+
+# Full pipeline: read pod logs -> keep the app's JSON line -> ship to Loki.
+customConfig:
+  data_dir: /vector-data-dir
+  api:
+    enabled: true
+    address: 127.0.0.1:8686
+
+  sources:
+    k8s:
+      type: kubernetes_logs        # auto-discovers every pod's log on this node
+
+  transforms:
+    # Drop Vector's own logs so it doesn't feed on itself.
+    app_only:
+      type: filter
+      inputs: [k8s]
+      condition: '.kubernetes.pod_namespace != "lab2-observability" || .kubernetes.container_name != "vector"'
+
+  sinks:
+    loki:
+      type: loki
+      inputs: [app_only]
+      endpoint: http://loki-gateway.lab2-observability.svc.cluster.local
+      # Ship the app's original stdout line (already structured JSON). In Grafana
+      # use `| json` to pull out fields like status / trace_id.
+      encoding:
+        codec: raw_message
+      # Loki index labels — keep them low-cardinality. trace_id is NOT a label
+      # (too many values); it stays inside the JSON line, queried with `| json`.
+      # The chart renders customConfig through Helm's `tpl`, so Vector's own
+      # `{{ ... }}` templates must be escaped (backticks) or Helm tries to run
+      # `kubernetes` as a template function. Each entry resolves to the literal
+      # `{{ kubernetes.<field> }}` that Vector then expands per log event.
+      labels:
+        namespace: '{{ `{{ kubernetes.pod_namespace }}` }}'
+        app: '{{ `{{ kubernetes.pod_labels.app }}` }}'
+        container: '{{ `{{ kubernetes.container_name }}` }}'
+        pod: '{{ `{{ kubernetes.pod_name }}` }}'
+      out_of_order_action: accept
+
+# The Agent chart already adds the hostPath mounts and RBAC; nothing else needed.
+service:
+  enabled: false

@@ -15,6 +15,10 @@ datasources:
         access: proxy
         url: http://prometheus-server.lab2-observability.svc.cluster.local
         isDefault: true
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki-gateway.lab2-observability.svc.cluster.local
 
 persistence:
   enabled: true
