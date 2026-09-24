@@ -1,0 +1,49 @@
+# Receiver for Alertmanager notifications: logs every HTTP request it gets,
+# so `kubectl logs deploy/webhook-echo` shows exactly what Alertmanager sent.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhook-echo
+  namespace: lab2-observability
+  labels:
+    app: webhook-echo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webhook-echo
+  template:
+    metadata:
+      labels:
+        app: webhook-echo
+    spec:
+      containers:
+        - name: webhook-echo
+          image: mendhak/http-https-echo:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 96Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhook-echo
+  namespace: lab2-observability
+  labels:
+    app: webhook-echo
+spec:
+  selector:
+    app: webhook-echo
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  type: ClusterIP

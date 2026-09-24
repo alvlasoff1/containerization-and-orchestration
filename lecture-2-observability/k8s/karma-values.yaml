@@ -1,0 +1,3 @@
+# Helm values for the karma chart (zekker6/karma): Karma reads alerts from our Alertmanager.
+env:
+  ALERTMANAGER_URI: "http://prometheus-alertmanager.lab2-observability.svc.cluster.local:9093"

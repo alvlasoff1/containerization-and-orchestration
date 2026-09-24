@@ -13,6 +13,52 @@ server:
   persistentVolume:
     enabled: false
 alertmanager:
-  enabled: false
+  enabled: true
+  persistence:
+    enabled: false
+  config:
+    receivers:
+      - name: webhook-echo
+        webhook_configs:
+          - url: http://webhook-echo.lab2-observability.svc.cluster.local:8080/
+            send_resolved: true
+    route:
+      receiver: webhook-echo
+      group_by: ['alertname']
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 1h
 prometheus-pushgateway:
   enabled: false
+serverFiles:
+  alerting_rules.yml:
+    groups:
+      - name: api-critical
+        rules:
+          - alert: ApiDown
+            expr: 'up{job="api"} == 0'
+            for: 1m
+            labels:
+              severity: critical
+              service: api
+            annotations:
+              summary: "api не отвечает"
+              description: "Prometheus не может опросить api больше минуты. Проверить под api и его логи."
+          - alert: ApiHighErrorRate
+            expr: 'sum(rate(http_errors_total{job="api"}[5m])) / sum(rate(http_requests_total{job="api"}[5m])) > 0.05'
+            for: 2m
+            labels:
+              severity: critical
+              service: api
+            annotations:
+              summary: "Доля ответов 5xx у api выше 5%"
+              description: "Больше 5% запросов заканчиваются ошибкой уже 2 минуты. Смотреть логи api и трейсы упавших запросов."
+          - alert: ApiHighLatencyP95
+            expr: 'histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job="api"}[5m])) by (le)) > 1'
+            for: 2m
+            labels:
+              severity: critical
+              service: api
+            annotations:
+              summary: "p95 времени ответа api выше 1 секунды"
+              description: "95-й перцентиль латентности выше 1 с уже 2 минуты. В Jaeger найти медленный шаг, проверить нагрузку и ресурсы."
