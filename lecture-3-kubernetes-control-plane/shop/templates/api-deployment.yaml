@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "shop.fullname" . }}-api
+  labels:
+    {{- include "shop.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  replicas: {{ .Values.api.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: {{ .Values.api.strategy.maxUnavailable }}
+      maxSurge: {{ .Values.api.strategy.maxSurge }}
+  selector:
+    matchLabels:
+      {{- include "shop.selectorLabels" (dict "root" . "component" "api") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "shop.selectorLabels" (dict "root" . "component" "api") | nindent 8 }}
+    spec:
+      terminationGracePeriodSeconds: {{ .Values.api.terminationGracePeriodSeconds }}
+      securityContext:
+        runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+        runAsUser: {{ .Values.securityContext.runAsUser }}
+        seccompProfile:
+          type: {{ .Values.securityContext.seccompProfile.type }}
+      containers:
+        - name: api
+          image: "{{ .Values.image.registry }}/{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: DATABASE_URL
+              value: {{ .Values.database.url | quote }}
+            - name: DRAIN_DELAY
+              value: {{ .Values.api.drainDelay | quote }}
+            {{- if .Values.api.healthFail }}
+            - name: HEALTH_FAIL
+              value: "true"
+            {{- end }}
+          # preStop runs before SIGTERM. The httpGet hits the app's /prestop,
+          # which marks the pod NotReady and blocks for DRAIN_DELAY, covering the
+          # kube-proxy endpoint-removal window. httpGet (not exec) because the
+          # distroless image has no shell or sleep binary.
+          lifecycle:
+            preStop:
+              httpGet:
+                path: /prestop
+                port: http
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
+            readOnlyRootFilesystem: {{ .Values.securityContext.readOnlyRootFilesystem }}
+            capabilities:
+              {{- toYaml .Values.securityContext.capabilities | nindent 14 }}
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}

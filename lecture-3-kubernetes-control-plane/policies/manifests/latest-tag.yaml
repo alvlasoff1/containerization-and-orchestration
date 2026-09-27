@@ -1,0 +1,17 @@
+# Breaks ONLY rule 4 (K8sDisallowLatestTag): image pinned to :latest.
+# Passes the rest: requests present, limit == request, not privileged.
+# Expected: denied — image <nginx:latest> uses the mutable 'latest' tag
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bad-latest-tag
+spec:
+  containers:
+    - name: app
+      image: nginx:latest
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          memory: 64Mi

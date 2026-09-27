@@ -1,0 +1,54 @@
+
+image:
+  registry: alvlasoff
+  pullPolicy: IfNotPresent
+database:
+  url: "postgres://shop:shop@shop-postgres-rw:5432/shop?sslmode=disable"
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
+api:
+  replicaCount: 2
+  image:
+    repository: api
+    tag: "0.0.7"
+  strategy:
+    maxUnavailable: 0
+    maxSurge: 1
+  service:
+    type: NodePort
+    port: 80
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 64Mi
+  healthFail: true
+  drainDelay: "5s"
+  terminationGracePeriodSeconds: 30
+
+worker:
+  replicaCount: 2
+  image:
+    repository: worker
+    tag: "0.0.1"
+  pollInterval: "2s"
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 64Mi
+  healthFail: false

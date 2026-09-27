@@ -1,0 +1,35 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8sdisallowlatesttag
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sDisallowLatestTag
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8sdisallowlatesttag
+
+        violation[{"msg": msg}] {
+          c := input_containers[_]
+          endswith(c.image, ":latest")
+          msg := sprintf("image <%v> uses the mutable 'latest' tag", [c.image])
+        }
+
+        violation[{"msg": msg}] {
+          c := input_containers[_]
+          not has_tag(c.image)
+          msg := sprintf("image <%v> has no explicit tag (defaults to latest)", [c.image])
+        }
+
+        has_tag(image) {
+          parts := split(image, "/")
+          last := parts[count(parts) - 1]
+          contains(last, ":")
+        }
+
+        input_containers[c] { c := input.review.object.spec.containers[_] }
+        input_containers[c] { c := input.review.object.spec.initContainers[_] }
+        input_containers[c] { c := input.review.object.spec.ephemeralContainers[_] }

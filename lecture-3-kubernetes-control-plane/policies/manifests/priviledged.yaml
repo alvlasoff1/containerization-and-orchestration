@@ -1,0 +1,19 @@
+# Breaks ONLY rule 2 (K8sDisallowPrivileged): securityContext.privileged: true.
+# Passes the rest: tagged non-latest image, requests present, limit == request.
+# Expected: denied — privileged container is not allowed: <app>
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bad-privileged
+spec:
+  containers:
+    - name: app
+      image: nginx:1.27.2
+      securityContext:
+        privileged: true
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          memory: 64Mi

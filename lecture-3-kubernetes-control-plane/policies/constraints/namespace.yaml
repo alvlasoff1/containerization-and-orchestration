@@ -1,0 +1,10 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sRequireNamespaceAppLabel
+metadata:
+  name: require-namespace-app-label
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Namespace"]

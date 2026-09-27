@@ -1,0 +1,9 @@
+# Breaks ONLY rule 3 (K8sRequireNamespaceAppLabel): a Namespace with labels but
+# no 'app'. The Pod-scoped rules don't apply to a Namespace, so this is isolated.
+# Expected: denied — Namespace must have a non-empty 'app' label
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bad-no-app-label
+  labels:
+    team: shop

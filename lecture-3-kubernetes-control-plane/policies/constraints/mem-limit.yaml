@@ -1,0 +1,10 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sMemoryLimitsEqualRequests
+metadata:
+  name: memory-limits-equal-requests
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]

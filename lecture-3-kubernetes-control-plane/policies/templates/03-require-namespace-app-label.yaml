@@ -1,0 +1,23 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8srequirenamespaceapplabel
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sRequireNamespaceAppLabel
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8srequirenamespaceapplabel
+
+        violation[{"msg": msg}] {
+          not has_app_label
+          msg := "Namespace must have a non-empty 'app' label"
+        }
+
+        has_app_label {
+          val := input.review.object.metadata.labels.app
+          val != ""
+        }

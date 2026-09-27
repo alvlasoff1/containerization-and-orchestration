@@ -1,0 +1,12 @@
+# Breaks ONLY rule 5 (K8sRequireResourceRequests): no resources block at all.
+# Note: we set NO limits either, so rule 1 stays clean (limit == request == "").
+# Passes the rest: tagged non-latest image, not privileged.
+# Expected: denied — container <app> is missing a cpu request / a memory request
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bad-no-requests
+spec:
+  containers:
+    - name: app
+      image: nginx:1.27.2

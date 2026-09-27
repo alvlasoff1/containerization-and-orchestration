@@ -1,0 +1,19 @@
+# Breaks ONLY rule 1 (K8sMemoryLimitsEqualRequests):
+#   limits.memory (128Mi) != requests.memory (64Mi).
+# Passes the rest: tagged non-latest image, requests present, not privileged.
+# Expected: admission webhook "validation.gatekeeper.sh" denied the request:
+#   memory limit (128Mi) must equal memory request (64Mi)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bad-mem-limit-ne-request
+spec:
+  containers:
+    - name: app
+      image: nginx:1.27.2
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          memory: 128Mi
