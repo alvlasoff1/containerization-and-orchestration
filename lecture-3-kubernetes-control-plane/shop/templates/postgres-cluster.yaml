@@ -1,0 +1,36 @@
+# The database, described declaratively. CloudNativePG's controller (installed
+# once, cluster-wide, in cnpg-system) watches objects of this kind and does the
+# actual work: creates the pod, attaches a disk via the local-path StorageClass,
+# runs initdb, and keeps reconciling this object forever — same reconciliation
+# loop as a Deployment, just with a lot more domain knowledge baked in.
+#
+# Name must be "shop-postgres" so the read-write service CloudNativePG creates
+# is "shop-postgres-rw", matching values.yaml's DATABASE_URL.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ include "shop.fullname" . }}-postgres
+  labels:
+    {{- include "shop.labels" . | nindent 4 }}
+spec:
+  instances: 1
+
+  storage:
+    size: 300Mi
+    storageClass: local-path
+
+  bootstrap:
+    initdb:
+      database: {{ .Values.database.name | default "shop" }}
+      owner: {{ .Values.database.user | default "shop" }}
+      secret:
+        name: {{ include "shop.fullname" . }}-postgres-credentials
+
+  # Satisfies require-resource-requests and memory-limits-equal-requests from
+  # part 1 — same reason the cnpg operator pod needed --set resources.* earlier.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 256Mi

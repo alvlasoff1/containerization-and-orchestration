@@ -11,3 +11,14 @@
 
 При применении получили запрет -- part-1-1.png
 
+## Postgres через оператора
+
+Оператор — **CloudNativePG**, поставлен один раз на весь кластер (namespace `cnpg-system`). В чарт `shop` добавлены `templates/postgres-credentials.yaml` (Secret с логином/паролем) и `templates/postgres-cluster.yaml` (объект `Cluster`: 1 инстанс, диск 300Mi, `bootstrap.initdb` создаёт базу `shop`).
+
+**Самоисцеление:** `kubectl delete pod shop-postgres-1 -n lab3-control-plane` → под вернулся сам, с тем же именем и тем же диском (в отличие от `api`, где под взаимозаменяем, у базы конкретные данные на конкретном PVC).
+
+**spec/status** (`kubectl get cluster shop-postgres -n lab3-control-plane -o yaml`): `spec` — то, что написано руками в `postgres-cluster.yaml`. `status` целиком заполняет оператор: `readyInstances`, `currentPrimary: shop-postgres-1`, версия образа, health-проверки — ничего из этого я не писал, это результат его reconciliation loop.
+
+**Отличие оператора и  `controller-manager`:** оба непрерывно сверяют actual и desired state через API server — механизм тот же. В основном отличие в нюансах настроек и конкретизации под сущность: `controller-manager` универсален (для него `Deployment` — это просто N одинаковых подов), а CloudNativePG понимает предметную область Postgres — знает про primary/replica, сам поставил `Termination Grace Period: 1800s` вместо стандартных 30 секунд, чтобы база не оборвалась на середине checkpoint, из-за этого под был довольно долго в состоянии Terminating.
+![Состояние после сноса пода](images/part-3.png)
+
