@@ -5,7 +5,7 @@ extraScrapeConfigs: |
     scrape_interval: 15s
     static_configs:
       - targets:
-          - api.lab2-observability.svc.cluster.local:8080
+          - shop-api.lab3-control-plane.svc.cluster.local:80
         labels:
           service: api
 

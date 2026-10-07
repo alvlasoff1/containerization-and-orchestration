@@ -1,0 +1,77 @@
+
+image:
+  registry: alvlasoff
+  pullPolicy: IfNotPresent
+database:
+  url: "postgres://shop:shop@shop-postgres-rw:5432/shop?sslmode=disable"
+
+spread:
+  mechanism: podAntiAffinity
+  topologyKey: kubernetes.io/hostname
+  # topologySpreadConstraints:
+  maxSkew: 1
+  whenUnsatisfiable: DoNotSchedule
+  # podAntiAffinity:
+  required: true
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
+api:
+  replicaCount: 2
+  image:
+    repository: api
+    tag: "0.0.7"
+  strategy:
+    maxUnavailable: 0
+    maxSurge: 1
+  service:
+    type: NodePort
+    port: 80
+  resources:
+    requests:
+      cpu: 965m      # krr recommendation (was 50m guess)
+      memory: 100Mi  # krr recommendation (was 64Mi guess)
+    limits:
+      memory: 100Mi
+  healthFail: false
+  drainDelay: "5s"
+  terminationGracePeriodSeconds: 30
+
+worker:
+  replicaCount: 2
+  image:
+    repository: worker
+    tag: "0.0.1"
+  pollInterval: "2s"
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      cpu: 10m       # krr recommendation (was 50m guess)
+      memory: 100Mi  # krr recommendation (was 64Mi guess)
+    limits:
+      memory: 100Mi
+  healthFail: false
+
+batch:
+  replicaCount: 1
+  image:
+    repository: batch
+    tag: "0.0.1"
+  burnCpus: 1
+  memMb: 64
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 128Mi
