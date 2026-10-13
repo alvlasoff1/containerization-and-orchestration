@@ -5,6 +5,21 @@ image:
 database:
   url: "postgres://shop:shop@shop-postgres-rw:5432/shop?sslmode=disable"
 
+spread:
+  mechanism: podAntiAffinity
+  required: true
+  topologyKey: kubernetes.io/hostname
+
+priorityClasses:
+  critical:
+    name: shop-critical
+    value: 100000
+    description: "Critical shop workloads"
+  batch:
+    name: shop-batch
+    value: 100
+    description: "Background batch workload"
+
 securityContext:
   runAsNonRoot: true
   runAsUser: 65534
@@ -21,17 +36,25 @@ api:
     repository: api
     tag: "0.0.7"
   strategy:
-    maxUnavailable: 0
+    # При обязательном anti-affinity на двух нодах rollout должен уметь
+    # временно уменьшить старую ReplicaSet, иначе старая и новая реплики
+    # блокируют друг друга.
+    maxUnavailable: 1
     maxSurge: 1
   service:
     type: NodePort
     port: 80
   resources:
     requests:
-      cpu: 50m
-      memory: 64Mi
+      cpu: 10m
+      memory: 100Mi
     limits:
-      memory: 64Mi
+      cpu: 10m
+      memory: 100Mi
+  priorityClassName: shop-critical
+  pdb:
+    enabled: true
+    minAvailable: 1
   healthFail: false
   drainDelay: "5s"
   terminationGracePeriodSeconds: 30
@@ -47,8 +70,37 @@ worker:
     port: 80
   resources:
     requests:
-      cpu: 50m
-      memory: 64Mi
+      cpu: 10m
+      memory: 100Mi
     limits:
-      memory: 64Mi
+      memory: 100Mi
   healthFail: false
+
+postgres:
+  priorityClassName: shop-critical
+  pdb:
+    enabled: true
+    minAvailable: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 100m
+      memory: 256Mi
+
+batch:
+  replicaCount: 1
+  image:
+    repository: batch
+    tag: "0.0.1"
+  priorityClassName: shop-batch
+  burnCpus: 1
+  memMb: 64
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+    limits:
+      cpu: "2"
+      memory: 256Mi

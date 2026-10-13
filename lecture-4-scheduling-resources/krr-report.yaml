@@ -1,0 +1,260 @@
+scans:
+- object:
+    cluster: default
+    name: shop-api
+    container: api
+    pods:
+    - name: shop-api-d956ffbb5-788kf
+      deleted: true
+    - name: shop-api-9f6b8bd4b-x7sxp
+      deleted: false
+    - name: shop-api-9f6b8bd4b-2699s
+      deleted: false
+    hpa: null
+    namespace: lab3-control-plane
+    kind: Deployment
+    allocations:
+      requests:
+        cpu: 0.965
+        memory: 104857600.0
+      limits:
+        cpu: null
+        memory: 104857600.0
+      info: {}
+    warnings: []
+    labels:
+      app: shop
+      app.kubernetes.io/component: api
+      app.kubernetes.io/instance: shop
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: shop
+      helm.sh/chart: shop-0.1.0
+    annotations:
+      deployment.kubernetes.io/revision: '22'
+      meta.helm.sh/release-name: shop
+      meta.helm.sh/release-namespace: lab3-control-plane
+  recommended:
+    requests:
+      cpu:
+        value: 0.01
+        severity: CRITICAL
+      memory:
+        value: 104857600.0
+        severity: GOOD
+    limits:
+      cpu:
+        value: null
+        severity: GOOD
+      memory:
+        value: 104857600.0
+        severity: GOOD
+    info:
+      cpu: null
+      memory: null
+  severity: CRITICAL
+- object:
+    cluster: default
+    name: shop-batch
+    container: batch
+    pods:
+    - name: shop-batch-5644d6d75b-67drk
+      deleted: false
+    hpa: null
+    namespace: lab3-control-plane
+    kind: Deployment
+    allocations:
+      requests:
+        cpu: 0.1
+        memory: 134217728.0
+      limits:
+        cpu: null
+        memory: 134217728.0
+      info: {}
+    warnings: []
+    labels:
+      app: shop
+      app.kubernetes.io/component: batch
+      app.kubernetes.io/instance: shop
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: shop
+      helm.sh/chart: shop-0.1.0
+    annotations:
+      deployment.kubernetes.io/revision: '1'
+      meta.helm.sh/release-name: shop
+      meta.helm.sh/release-namespace: lab3-control-plane
+  recommended:
+    requests:
+      cpu:
+        value: 1.004
+        severity: CRITICAL
+      memory:
+        value: 104857600.0
+        severity: GOOD
+    limits:
+      cpu:
+        value: null
+        severity: GOOD
+      memory:
+        value: 104857600.0
+        severity: GOOD
+    info:
+      cpu: null
+      memory: null
+  severity: CRITICAL
+- object:
+    cluster: default
+    name: shop-worker
+    container: worker
+    pods:
+    - name: shop-worker-6786b894f7-rbfcz
+      deleted: false
+    - name: shop-worker-6786b894f7-wl4ff
+      deleted: false
+    hpa: null
+    namespace: lab3-control-plane
+    kind: Deployment
+    allocations:
+      requests:
+        cpu: 0.01
+        memory: 104857600.0
+      limits:
+        cpu: null
+        memory: 104857600.0
+      info: {}
+    warnings: []
+    labels:
+      app: shop
+      app.kubernetes.io/component: worker
+      app.kubernetes.io/instance: shop
+      app.kubernetes.io/managed-by: Helm
+      app.kubernetes.io/name: shop
+      helm.sh/chart: shop-0.1.0
+    annotations:
+      deployment.kubernetes.io/revision: '5'
+      meta.helm.sh/release-name: shop
+      meta.helm.sh/release-namespace: lab3-control-plane
+  recommended:
+    requests:
+      cpu:
+        value: 0.01
+        severity: GOOD
+      memory:
+        value: 104857600.0
+        severity: GOOD
+    limits:
+      cpu:
+        value: null
+        severity: GOOD
+      memory:
+        value: 104857600.0
+        severity: GOOD
+    info:
+      cpu: null
+      memory: null
+  severity: GOOD
+score: 33
+resources:
+- cpu
+- memory
+description: '[b]Simple Strategy[/b]
+
+
+  CPU request: 95.0% percentile, limit: unset
+
+  Memory request: max + 15.0%, limit: max + 15.0%
+
+  History: 1.0 hours
+
+  Step: 1.0 minutes
+
+
+  All parameters can be customized. For example: `krr simple --cpu_percentile=90 --memory_buffer_percentage=15
+  --history_duration=24 --timeframe_duration=0.5`
+
+
+  This strategy does not work with objects with HPA defined (Horizontal Pod Autoscaler).
+
+  If HPA is defined for CPU or Memory, the strategy will return "?" for that resource.
+
+  You can override this behaviour by passing the --allow-hpa flag
+
+
+  Learn more: [underline]https://github.com/robusta-dev/krr#algorithm[/underline]'
+strategy:
+  name: simple
+  settings:
+    history_duration: 1.0
+    timeframe_duration: 1.0
+    cpu_percentile: 95.0
+    memory_buffer_percentage: 15.0
+    points_required: 3
+    allow_hpa: false
+    use_oomkill_data: false
+    oom_memory_buffer_percentage: 25.0
+errors: []
+clusterSummary:
+  cluster_memory: 8324476928.0
+  cluster_cpu: 8.0
+  kube_system_mem_req: 73400320.0
+  kube_system_cpu_req: 0.1
+config:
+  quiet: false
+  verbose: false
+  clusters: []
+  kubeconfig: null
+  impersonate_user: null
+  impersonate_group: null
+  namespaces:
+  - lab3-control-plane
+  resources: '*'
+  selector: null
+  cpu_min_value: 10
+  memory_min_value: 100
+  prometheus_url: http://10.43.158.99:9090
+  prometheus_auth_header: null
+  prometheus_other_headers: {}
+  prometheus_ssl_enabled: false
+  prometheus_cluster_label: null
+  prometheus_label: null
+  eks_managed_prom: false
+  eks_managed_prom_profile_name: null
+  eks_access_key: null
+  eks_secret_key: null
+  eks_service_name: aps
+  eks_managed_prom_region: null
+  eks_assume_role: null
+  coralogix_token: null
+  openshift: false
+  max_workers: 10
+  discovery_job_batch_size: 5000
+  discovery_job_max_batches: 100
+  job_grouping_labels: null
+  job_grouping_limit: 500
+  format: yaml
+  show_cluster_name: false
+  strategy: simple
+  log_to_stderr: false
+  width: null
+  show_severity: true
+  publish_scan_url: null
+  start_time: null
+  scan_id: null
+  named_sinks: []
+  file_output: /tmp/krr-lab3.yaml
+  file_output_dynamic: false
+  slack_output: null
+  slack_title: null
+  azureblob_output: null
+  teams_webhook: null
+  azure_subscription_id: null
+  azure_resource_group: null
+  other_args:
+    history_duration: '1'
+    timeframe_duration: '1'
+    cpu_percentile: '95'
+    memory_buffer_percentage: '15'
+    points_required: '3'
+    allow_hpa: false
+    use_oomkill_data: false
+    oom_memory_buffer_percentage: '25'
+  inside_cluster: false
