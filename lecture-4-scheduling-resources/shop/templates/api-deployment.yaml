@@ -21,7 +21,14 @@ spec:
         {{- include "shop.selectorLabels" (dict "root" . "component" "api") | nindent 8 }}
     spec:
       terminationGracePeriodSeconds: {{ .Values.api.terminationGracePeriodSeconds }}
-      {{- include "shop.spread" (dict "root" . "component" "api") | nindent 6 }}
+      priorityClassName: {{ .Values.api.priorityClassName }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: {{ .Values.spread.topologyKey }}
+              labelSelector:
+                matchLabels:
+                  {{- include "shop.selectorLabels" (dict "root" . "component" "api") | nindent 18 }}
       securityContext:
         runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
         runAsUser: {{ .Values.securityContext.runAsUser }}

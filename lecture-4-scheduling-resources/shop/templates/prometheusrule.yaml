@@ -1,0 +1,47 @@
+{{- if .Values.monitoring.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "shop.fullname" . }}-sla
+  labels:
+    {{- include "shop.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: shop-order-sla
+      rules:
+        - alert: ShopOrderLatencyP95High
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(http_request_duration_seconds_bucket{namespace="{{ .Release.Namespace }}",path="/order"}[2m])) by (le)
+            ) > {{ .Values.monitoring.prometheusRule.latencyP95Seconds }}
+          for: {{ .Values.monitoring.prometheusRule.forDuration }}
+          labels:
+            severity: critical
+          annotations:
+            summary: "p95 POST /order выше SLA"
+            description: "p95 заказов превышает {{ .Values.monitoring.prometheusRule.latencyP95Seconds }} с уже {{ .Values.monitoring.prometheusRule.forDuration }}."
+        - alert: ShopOrderErrorRateHigh
+          expr: |
+            sum(rate(http_request_duration_seconds_count{namespace="{{ .Release.Namespace }}",path="/order",status=~"5.."}[2m]))
+            /
+            sum(rate(http_request_duration_seconds_count{namespace="{{ .Release.Namespace }}",path="/order"}[2m]))
+            > {{ .Values.monitoring.prometheusRule.errorRatio }}
+          for: {{ .Values.monitoring.prometheusRule.forDuration }}
+          labels:
+            severity: critical
+          annotations:
+            summary: "Доля 5xx на POST /order выше SLA"
+            description: "Ошибок больше {{ .Values.monitoring.prometheusRule.errorRatio }} от запросов уже {{ .Values.monitoring.prometheusRule.forDuration }}."
+        - alert: ShopApiCpuThrottling
+          expr: |
+            sum by (pod) (rate(container_cpu_cfs_throttled_periods_total{namespace="{{ .Release.Namespace }}",pod=~"{{ include "shop.fullname" . }}-api-.*",container="api"}[2m]))
+            /
+            sum by (pod) (rate(container_cpu_cfs_periods_total{namespace="{{ .Release.Namespace }}",pod=~"{{ include "shop.fullname" . }}-api-.*",container="api"}[2m]))
+            > {{ .Values.monitoring.prometheusRule.throttleRatio }}
+          for: {{ .Values.monitoring.prometheusRule.throttleFor }}
+          labels:
+            severity: warning
+          annotations:
+            summary: "api упирается в CPU limit"
+            description: "Pod {{ `{{ $labels.pod }}` }} throttle'ится больше {{ .Values.monitoring.prometheusRule.throttleRatio }} периодов: limit CPU слишком мал для нагрузки."
+{{- end }}

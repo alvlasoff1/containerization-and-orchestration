@@ -15,6 +15,7 @@ spec:
       labels:
         {{- include "shop.selectorLabels" (dict "root" . "component" "worker") | nindent 8 }}
     spec:
+      priorityClassName: {{ .Values.worker.priorityClassName }}
       securityContext:
         runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
         runAsUser: {{ .Values.securityContext.runAsUser }}
