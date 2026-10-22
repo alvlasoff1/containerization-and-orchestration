@@ -16,7 +16,9 @@ podAntiAffinity и topologySpreadConstraints определяют правила
 POST /order — 300 запросов
 ```
 
-Все запросы завершились успешно. Короткая повторная проверка показана на рисунке [part_3_load.png](part_3_load.png).
+Все запросы завершились успешно. Короткая повторная проверка показана на рисунке 
+
+![part_3_load.png](part_3_load.png).
 
 После этого включил в Prometheus сбор cAdvisor и kube-state-metrics и запустил `krr` для namespace `lab3-control-plane`. Отчёт сохранён в [krr-report.yaml](krr-report.yaml), снимок вывода — [part_3_krr.png](part_3_krr.png).
 
