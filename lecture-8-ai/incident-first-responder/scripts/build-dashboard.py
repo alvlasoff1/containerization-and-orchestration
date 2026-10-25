@@ -19,11 +19,11 @@ def ts(i, title, targets, x, y, w=12, h=8, unit="short", bars=False, desc=""):
 
 
 panels = [
-    ts(1, "Запуски workflow по статусу (за 5 минут)", [
-        (f'sum by (status) (increase(n8n_workflow_execution_duration_seconds_count{{{WF}}}[5m]))', "{{status}}")],
-       0, 0, bars=True, desc="Сколько раз отработал incident first responder и чем закончился запуск."),
+    ts(1, "Запуски workflow по статусу (с запуска n8n)", [
+        (f'sum by (status) (n8n_workflow_execution_duration_seconds_count{{{WF}}})', "{{status}}")],
+       0, 0, desc="Накопительное число запусков incident first responder по статусу; счётчики n8n обнуляются при рестарте."),
     ts(2, "Длительность запуска workflow", [
-        (f'sum(rate(n8n_workflow_execution_duration_seconds_sum{{{WF}}}[30m])) / sum(rate(n8n_workflow_execution_duration_seconds_count{{{WF}}}[30m]))', "среднее"),
+        (f'sum(n8n_workflow_execution_duration_seconds_sum{{{WF}}}) / sum(n8n_workflow_execution_duration_seconds_count{{{WF}}})', "среднее"),
         (f'histogram_quantile(0.9, sum by (le) (rate(n8n_workflow_execution_duration_seconds_bucket{{{WF}}}[30m])))', "p90")],
        12, 0, unit="s", desc="Почти всё время — работа LLM на CPU."),
     ts(3, "Вызовы инструментов агентом (MCP Kubernetes)", [
