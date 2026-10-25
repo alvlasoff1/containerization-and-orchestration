@@ -10,17 +10,13 @@ podAntiAffinity и topologySpreadConstraints определяют правила
 
 ## Часть 3 — Рекомендации krr
 
-Сначала проверил order path нагрузкой:
+Отправил 300 запросов `POST /order`, все завершились успешно. На скриншоте — повторная проверка: 30 успешных запросов, ошибок нет.
 
-```bash
-POST /order — 300 запросов
-```
+![Проверка POST /order](images/part_3_load.png)
 
-Все запросы завершились успешно. Короткая повторная проверка показана на рисунке
+Включил в Prometheus сбор метрик cAdvisor и kube-state-metrics, затем запустил `krr` для namespace `lab3-control-plane`. Результат сохранён в [krr-report.yaml](krr-report.yaml).
 
-![part_3_load.png](part_3_load.png).
-
-После этого включил в Prometheus сбор cAdvisor и kube-state-metrics и запустил `krr` для namespace `lab3-control-plane`. Отчёт сохранён в [krr-report.yaml](krr-report.yaml), снимок вывода — [part_3_krr.png](part_3_krr.png).
+![Рекомендации krr](images/part_3_krr.png)
 
 Рекомендации `krr`:
 
@@ -28,17 +24,23 @@ POST /order — 300 запросов
 - `worker`: CPU request `10m`, memory request/limit `100Mi`;
 - `batch`: CPU request `1004m`, memory request/limit `100Mi`.
 
-Для CPU `krr` рекомендует не задавать limit. Для `postgres` отдельной рекомендации нет, потому что он создаётся оператором CloudNativePG и не определяется `krr` как обычный Deployment или StatefulSet.
+CPU limit `krr` рекомендует убрать. Для `postgres`, которым управляет CloudNativePG, рекомендаций в отчёте нет.
 
-Исходные значения в chart были `50m/64Mi` для `api` и `worker`. Рекомендации `krr` показали, что для этих сервисов memory request нужно увеличить до `100Mi`, а CPU request снизить до `10m`.
+Для `api` и `worker` снизил CPU request с `50m` до `10m`, memory request увеличил с `64Mi` до `100Mi`. Значения записал в `lecture-3-kubernetes-control-plane/shop/values.yaml`.
 
-Значения перенесены в `lecture-3-kubernetes-control-plane/shop/values.yaml`. Первая попытка `helm upgrade` завершилась по timeout: на сервере была одна нода, а обязательный `podAntiAffinity` не позволил временно разместить новую ReplicaSet. Это показано на рисунке [part_3_upgrade_blocked.png](part_3_upgrade_blocked.png).
+Первый `helm upgrade` завершился по таймауту: на одной ноде обязательный `podAntiAffinity` не позволял разместить новый pod API. Он остался в `Pending`.
 
-После добавления второй worker-ноды upgrade был завершён успешно. Для rollout также задано `maxUnavailable: 1`, потому что при обязательном anti-affinity старую ReplicaSet нужно сначала уменьшить, чтобы новая реплика смогла занять освободившуюся ноду.
+![Новый pod API в Pending при обновлении](images/part_3_upgrade_blocked.png)
+
+После добавления второй ноды обновление прошло. Для rollout задал `maxUnavailable: 1`, чтобы сначала удалялась старая реплика и освобождалась нода для новой.
 
 ## Часть 4 — Распределение API по нодам
 
-Для `api` используется `podAntiAffinity` с `topologyKey: kubernetes.io/hostname`. Это запрещает размещать две реплики API на одной ноде.
+Для `api` задал обязательный `podAntiAffinity` с `topologyKey: kubernetes.io/hostname`: две реплики не должны размещаться на одной ноде.
+
+До добавления второй ноды старые реплики работали на `devops-labs`, а новая оставалась в `Pending`.
+
+![Реплики API до добавления второй ноды](images/part_4_test.png)
 
 Проверка выполнена командой:
 
@@ -46,35 +48,41 @@ POST /order — 300 запросов
 kubectl get pods -n lab3-control-plane -l app.kubernetes.io/component=api -o wide
 ```
 
-Результат проверки показан на рисунке [part_4_spread.png](part_4_spread.png). В кластере видны ноды `devops-labs` и `worker-2b`, а реплики `api` работают на разных нодах.
+После добавления `worker-2b` и завершения обновления реплики API работают на разных нодах: `devops-labs` и `worker-2b`.
 
-Вторая worker-нода запущена как отдельный k3s-agent контейнер на той же ВМ. Для Kubernetes это отдельная нода с отдельным hostname, но физически обе ноды зависят от одной ВМ.
+![Реплики API на разных нодах](images/part_4_spread.png)
 
-Таким образом, правило anti-affinity применилось: scheduler не разместил две реплики `api` на одной ноде. При отказе одной Kubernetes-ноды вторая реплика остаётся на другой ноде.
+`worker-2b` запущена как контейнер k3s-agent на той же ВМ. Правило anti-affinity выполнено, но от отказа общей ВМ такое размещение не защищает.
 
 ## Часть 5 — Приоритеты, QoS и PDB
 
-В `values.yaml` добавлены два класса приоритета:
+В `values.yaml` добавил два класса приоритета:
 
 - `shop-critical` со значением `100000` для `api` и `postgres`;
 - `shop-batch` со значением `100` для фоновой нагрузки `batch`.
 
-Большое значение priority позволяет критичным pod’ам получить преимущество при дефиците ресурсов и вытеснить менее важные pod’ы. `batch` имеет меньший приоритет.
+При нехватке ресурсов `api` и `postgres` могут вытеснить `batch`, поскольку их приоритет выше.
+
+![Классы приоритета shop-critical и shop-batch](images/part_5_priority_class.png)
 
 Для `api` и `postgres` requests равны limits:
 
 - `api`: CPU `10m`, memory `100Mi`;
 - `postgres`: CPU `100m`, memory `256Mi`.
 
-Поэтому эти pod’ы относятся к QoS `Guaranteed`. Для `batch` requests меньше limits: CPU `100m`/`2`, memory `100Mi`/`256Mi`. Его QoS — `Burstable`.
+Эти pod'ы получили QoS `Guaranteed`. У `batch` requests ниже limits: CPU `100m`/`2`, memory `100Mi`/`256Mi`, поэтому его QoS — `Burstable`. После `helm upgrade` проверил приоритеты и QoS:
 
-Добавлены PDB `shop-api` и `shop-postgres-pdb` с `minAvailable: 1`. Для PostgreSQL также остаётся PDB `shop-postgres-primary`, который создаётся оператором CloudNativePG.
+![Приоритеты и QoS pod'ов](images/part_5_qos.png)
 
-После `helm upgrade` `api` имеет priority `100000` и QoS `Guaranteed`, `batch` — priority `100` и QoS `Burstable`, а новый PostgreSQL pod получил priority `100000` и QoS `Guaranteed`. После штатного restart CloudNativePG кластер вернулся в состояние `Cluster in healthy state`.
+Добавил PDB `shop-api` и `shop-postgres-pdb` с `minAvailable: 1`. PDB `shop-postgres-primary` создан оператором CloudNativePG. На момент проверки разрешено удалить одну реплику API, для PostgreSQL — ни одной.
 
-Результат проверки показан на рисунке [part_5_priority_pdb.png](part_5_priority_pdb.png).
+![Бюджеты доступности API и PostgreSQL](images/part_5_pdb.png)
 
-PDB ограничивает добровольные disruption’ы и не запрещает принудительное вытеснение при preemption или отказ ноды. При memory pressure kubelet сначала рассматривает менее защищённые QoS-классы, поэтому `batch` должен пострадать раньше критического пути.
+PDB ограничивает добровольное выселение pod'ов, но не защищает от preemption или отказа ноды.
+
+После штатного перезапуска через CloudNativePG PostgreSQL получил priority `100000` и QoS `Guaranteed`. Кластер вернулся в состояние `Cluster in healthy state`.
+
+![Состояние кластера PostgreSQL после перезапуска](images/part_5_pg.png)
 
 ## Часть 6 — Дефицит, Pending и preemption
 
