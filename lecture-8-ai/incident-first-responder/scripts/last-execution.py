@@ -3,6 +3,7 @@
 вывод каждой ноды (через внутренний REST API n8n, логин владельцем).
 
 usage: last-execution.py <n8n_url> <owner_file> [node_name_filter]
+       last-execution.py <n8n_url> <owner_file> --list [N]   — список последних выполнений
 """
 import http.cookiejar
 import json
@@ -25,6 +26,12 @@ def call(path, body=None):
 
 
 call("/rest/login", {"emailOrLdapLoginId": cred["email"], "password": cred["password"]})
+if flt == "--list":
+    n = int(sys.argv[4]) if len(sys.argv) > 4 else 10
+    lst = call(f"/rest/executions?limit={n}")["data"]
+    for e in (lst["results"] if isinstance(lst, dict) else lst):
+        print(f"#{e['id']:>3}  {e.get('mode', ''):8} {e.get('status', ''):8} {e.get('startedAt', '')[:19]}  {e.get('stoppedAt') or ''}"[:80])
+    sys.exit(0)
 lst = call("/rest/executions?limit=1")["data"]
 items = lst["results"] if isinstance(lst, dict) else lst
 ex = call(f"/rest/executions/{items[0]['id']}")["data"]

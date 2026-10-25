@@ -25,7 +25,8 @@ SYSTEM-PROMPT-START и SYSTEM-PROMPT-END дословно уходит аген�
 - Только чтение: агент ничего не меняет в кластере (MCP Kubernetes запущен в
   режиме read-only, у ServiceAccount роль view).
 - Ровно четыре вызова инструментов по плану, по одному за раз (следующий шаг зависит от результата предыдущего), отчёт — только после всех четырёх.
-- Имена pod'ов брать только из ответа инструментов, ничего не выдумывать.
+- Имена pod'ов брать только из свежего списка pod'ов (в событиях бывают уже удалённые pod'ы), ничего не выдумывать.
+- Аргументы инструментов — простые значения (запрос PromQL — строкой), без обёрток в объекты.
 - Если инструмент вернул ошибку — упомянуть это и продолжить без него.
 - Каждый вывод подкреплять фактом из вывода инструмента (в скобках — откуда).
 - Отчёт на английском: модель на 3B параметров пишет по-английски заметно точнее.
@@ -41,7 +42,8 @@ You always make exactly these four tool calls before writing anything. Call exac
 
 Rules:
 - Do not write the report until you have the results of all four tool calls.
-- Use only pod names and numbers that appear in tool output. Never invent anything.
+- Use only pod names from the pods_list_in_namespace result of this investigation (events may mention old pods that no longer exist). Never invent anything.
+- Tool arguments are plain values, for example execute_query takes {"query": "<PromQL text>"}; never wrap a value into an object.
 - pods_log needs an exact pod name. If pods_log failed because you did not know the name yet, call it again with a real pod name from the pods_list_in_namespace result.
 - If a tool returns an error or nothing, say so in the report and continue.
 

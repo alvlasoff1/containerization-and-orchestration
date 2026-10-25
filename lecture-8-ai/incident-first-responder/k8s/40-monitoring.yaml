@@ -69,8 +69,13 @@ spec:
       rules:
         # 1. Workflow падает: дежурный не получит отчёт.
         - alert: FirstResponderWorkflowFailing
+          # increase не видит первую ошибку в только что появившемся ряду,
+          # поэтому отдельно ловим ряд, которого 15 минут назад не было.
           expr: |
             sum(increase(n8n_workflow_execution_duration_seconds_count{workflow_id="incidentFirstResp",status!="success"}[15m])) > 0
+            or
+            sum(n8n_workflow_execution_duration_seconds_count{workflow_id="incidentFirstResp",status!="success"})
+              unless sum(n8n_workflow_execution_duration_seconds_count{workflow_id="incidentFirstResp",status!="success"} offset 15m)
           labels:
             severity: warning
             namespace: lab8-n8n

@@ -25,8 +25,8 @@ data:
       {
        "id": 1,
        "type": "timeseries",
-       "title": "Запуски workflow по статусу (за 5 минут)",
-       "description": "Сколько раз отработал incident first responder и чем закончился запуск.",
+       "title": "Запуски workflow по статусу (с запуска n8n)",
+       "description": "Накопительное число запусков incident first responder по статусу; счётчики n8n обнуляются при рестарте.",
        "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -42,12 +42,12 @@ data:
          "unit": "short",
          "min": 0,
          "custom": {
-          "drawStyle": "bars",
+          "drawStyle": "line",
           "lineWidth": 2,
-          "fillOpacity": 60,
+          "fillOpacity": 10,
           "showPoints": "never",
           "stacking": {
-           "mode": "normal"
+           "mode": "none"
           }
          }
         },
@@ -69,7 +69,7 @@ data:
           "type": "prometheus",
           "uid": "prometheus"
          },
-         "expr": "sum by (status) (increase(n8n_workflow_execution_duration_seconds_count{workflow_id=\"incidentFirstResp\"}[5m]))",
+         "expr": "sum by (status) (n8n_workflow_execution_duration_seconds_count{workflow_id=\"incidentFirstResp\"})",
          "legendFormat": "{{status}}"
         }
        ]
@@ -121,7 +121,7 @@ data:
           "type": "prometheus",
           "uid": "prometheus"
          },
-         "expr": "sum(rate(n8n_workflow_execution_duration_seconds_sum{workflow_id=\"incidentFirstResp\"}[30m])) / sum(rate(n8n_workflow_execution_duration_seconds_count{workflow_id=\"incidentFirstResp\"}[30m]))",
+         "expr": "sum(n8n_workflow_execution_duration_seconds_sum{workflow_id=\"incidentFirstResp\"}) / sum(n8n_workflow_execution_duration_seconds_count{workflow_id=\"incidentFirstResp\"})",
          "legendFormat": "среднее"
         },
         {
