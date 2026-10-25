@@ -1,9 +1,3 @@
-## Подготовка
-
-Лабораторная выполнена в том же кластере kind, что и lab5 (control-plane и две worker-ноды, CNI Cilium), в отдельном namespace lab6-mesh. Стек мониторинга из Lab 2 тот же. Дополнительно включён сбор метрик контейнеров (cAdvisor), чтобы мерить CPU и память, и разрешён сбор через PodMonitor.
-
-Всё разворачивается chart'ом shop: версии api, Service, HTTPRoute для разделения трафика, аннотации mesh, gate, ServiceMonitor/PodMonitor, PrometheusRule и дашборд. Worker в этой лабораторной отключён, используются api и postgres.
-
 ## Часть 0 — Сервисы
 
 api расширен:
