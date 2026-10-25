@@ -1,0 +1,19 @@
+{
+  "version": "4",
+  "status": "firing",
+  "receiver": "n8n-first-responder",
+  "groupLabels": {"alertname": "ShopRetriesMaskingFailures"},
+  "commonLabels": {"alertname": "ShopRetriesMaskingFailures", "namespace": "lab6-mesh", "severity": "warning"},
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {"alertname": "ShopRetriesMaskingFailures", "namespace": "lab6-mesh", "severity": "warning"},
+      "annotations": {
+        "summary": "Backend api падает, retries это маскируют",
+        "description": "Больше 0.1 попыток к backend заканчиваются 5xx. Клиент может этого не видеть, но запас retries тратится."
+      },
+      "startsAt": "2026-10-25T12:19:45Z",
+      "generatorURL": "http://prometheus/graph?g0.expr=sum%28rate%28outbound_http_route_backend_response_statuses_total%7Bnamespace%3D%22lab6-mesh%22%2Cparent_name%3D%22shop-api%22%2Chttp_status%3D~%225..%22%7D%5B5m%5D%29%29+%2F+sum%28rate%28outbound_http_route_backend_response_statuses_total%7Bnamespace%3D%22lab6-mesh%22%2Cparent_name%3D%22shop-api%22%7D%5B5m%5D%29%29"
+    }
+  ]
+}

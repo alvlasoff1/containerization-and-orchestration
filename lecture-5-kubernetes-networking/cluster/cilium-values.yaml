@@ -1,0 +1,27 @@
+# Cilium поверх kind: kube-proxy остаётся (iptables), Cilium отвечает за
+# pod network (veth + eBPF), NetworkPolicy и наблюдаемость (Hubble).
+kubeProxyReplacement: false
+routingMode: tunnel
+tunnelProtocol: vxlan
+ipam:
+  mode: kubernetes
+operator:
+  replicas: 1
+  prometheus:
+    enabled: true
+prometheus:
+  enabled: true
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+  ui:
+    enabled: true
+  metrics:
+    enableOpenMetrics: true
+    enabled:
+      - "dns:labelsContext=source_namespace,source_workload,source_app"
+      - "drop:labelsContext=source_namespace,source_workload,source_app,destination_namespace,destination_workload,destination_app"
+      - "tcp:labelsContext=source_namespace,source_workload,source_app,destination_namespace,destination_workload,destination_app"
+      - "flow:labelsContext=source_namespace,destination_namespace"
+      - "policy:sourceContext=app|workload-name|pod|reserved-identity;destinationContext=app|workload-name|pod|dns|reserved-identity;labelsContext=source_namespace,destination_namespace"

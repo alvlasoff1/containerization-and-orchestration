@@ -1,0 +1,36 @@
+# Grafana из lab2 (тот же чарт grafana/grafana 10.5.15, NodePort 30030).
+# Отличия: datasource смотрит на Prometheus из kube-prometheus-stack,
+# включён sidecar, который подхватывает дашборды из ConfigMap'ов чарта shop,
+# анонимный read-only доступ для скриншотов.
+adminUser: admin
+adminPassword: admin
+
+service:
+  type: NodePort
+  nodePort: 30030
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        uid: prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus-operated.lab2-observability.svc.cluster.local:9090
+        isDefault: true
+
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    searchNamespace: ALL
+
+grafana.ini:
+  auth.anonymous:
+    enabled: true
+    org_role: Viewer
+
+persistence:
+  enabled: false

@@ -1,0 +1,32 @@
+# Два клиента для проверки mTLS: client-mesh в mesh (свой ServiceAccount —
+# своя identity), client-plain без mesh.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: shop-client
+  namespace: lab6-mesh
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: client-mesh
+  namespace: lab6-mesh
+  annotations:
+    linkerd.io/inject: enabled
+spec:
+  serviceAccountName: shop-client
+  containers:
+    - name: curl
+      image: curlimages/curl:8.10.1
+      command: ["sleep", "infinity"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: client-plain
+  namespace: lab6-mesh
+spec:
+  containers:
+    - name: curl
+      image: curlimages/curl:8.10.1
+      command: ["sleep", "infinity"]

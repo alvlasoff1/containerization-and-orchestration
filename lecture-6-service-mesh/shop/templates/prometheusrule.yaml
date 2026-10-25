@@ -1,0 +1,58 @@
+{{- if .Values.monitoring.prometheusRule.enabled }}
+{{- $r := .Values.monitoring.prometheusRule }}
+{{- $ns := .Release.Namespace }}
+{{- $inb := printf "direction=\"inbound\",namespace=\"%s\",tls=\"true\"" $ns }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "shop.fullname" . }}-mesh
+  labels:
+    {{- include "shop.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: shop-mesh
+      rules:
+        # 1. Новая версия в canary отвечает ошибками.
+        - alert: ShopCanaryErrorRateHigh
+          expr: |
+            sum(rate(response_total{ {{- $inb }},deployment="shop-api-v2",classification="failure"}[1m]))
+            /
+            sum(rate(response_total{ {{- $inb }},deployment="shop-api-v2"}[1m]))
+            > {{ $r.canaryErrorRatio }}
+          for: {{ $r.canaryFor }}
+          labels:
+            severity: critical
+            namespace: {{ $ns }}
+          annotations:
+            summary: "Canary v2 отвечает ошибками"
+            description: "Доля ошибок shop-api-v2 выше {{ $r.canaryErrorRatio }}. Gate должен откатить вес v2 в 0; проверить, что откат произошёл."
+        # 2. Ошибки доходят до клиента даже после retries — нарушение SLO.
+        - alert: ShopClientErrorRateHigh
+          expr: |
+            sum(rate(outbound_http_route_request_statuses_total{namespace="{{ $ns }}",parent_name="{{ include "shop.fullname" . }}-api",http_status=~"5.."}[2m]))
+            /
+            sum(rate(outbound_http_route_request_statuses_total{namespace="{{ $ns }}",parent_name="{{ include "shop.fullname" . }}-api"}[2m]))
+            > {{ $r.clientErrorRatio }}
+          for: {{ $r.clientFor }}
+          labels:
+            severity: critical
+            namespace: {{ $ns }}
+          annotations:
+            summary: "Клиенты shop-api получают 5xx"
+            description: "Доля 5xx, которую видят клиенты после retries, выше {{ $r.clientErrorRatio }}."
+        # 3. Retries скрывают падающий backend: клиенту хорошо, а backend
+        #    ошибается всё чаще и получает дополнительную нагрузку от повторов.
+        - alert: ShopRetriesMaskingFailures
+          expr: |
+            sum(rate(outbound_http_route_backend_response_statuses_total{namespace="{{ $ns }}",parent_name="{{ include "shop.fullname" . }}-api",http_status=~"5.."}[5m]))
+            /
+            sum(rate(outbound_http_route_backend_response_statuses_total{namespace="{{ $ns }}",parent_name="{{ include "shop.fullname" . }}-api"}[5m]))
+            > {{ $r.backendErrorRatio }}
+          for: {{ $r.backendFor }}
+          labels:
+            severity: warning
+            namespace: {{ $ns }}
+          annotations:
+            summary: "Backend api падает, retries это маскируют"
+            description: "Больше {{ $r.backendErrorRatio }} попыток к backend заканчиваются 5xx. Клиент может этого не видеть, но запас retries тратится."
+{{- end }}

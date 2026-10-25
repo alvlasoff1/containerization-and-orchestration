@@ -1,0 +1,102 @@
+# Мониторинг на стеке из lab2: экспортер Ollama, ServiceMonitor'ы,
+# три алерта и дашборд (ConfigMap подхватывает sidecar Grafana).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama-exporter
+  namespace: lab8-n8n
+  labels: {app: ollama-exporter}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: ollama-exporter}
+  template:
+    metadata:
+      labels: {app: ollama-exporter}
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: lab5-worker2
+      containers:
+        - name: exporter
+          image: ollama-exporter:lab8
+          imagePullPolicy: Never
+          env:
+            - {name: OLLAMA_URL, value: "http://ollama.lab8-n8n.svc:11434"}
+          ports:
+            - {name: metrics, containerPort: 9101}
+          resources:
+            requests: {cpu: 5m, memory: 16Mi}
+            limits: {memory: 48Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-exporter
+  namespace: lab8-n8n
+  labels: {app: ollama-exporter}
+spec:
+  selector: {app: ollama-exporter}
+  ports:
+    - {name: metrics, port: 9101, targetPort: metrics}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: lab8
+  namespace: lab8-n8n
+spec:
+  namespaceSelector:
+    matchNames: [lab8-n8n]
+  selector:
+    matchExpressions:
+      - {key: app, operator: In, values: [n8n, ollama-exporter, mcp-kubernetes]}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+    - port: metrics
+      path: /metrics
+      interval: 15s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: lab8-first-responder
+  namespace: lab8-n8n
+spec:
+  groups:
+    - name: lab8-first-responder
+      rules:
+        # 1. Workflow падает: дежурный не получит отчёт.
+        - alert: FirstResponderWorkflowFailing
+          expr: |
+            sum(increase(n8n_workflow_execution_duration_seconds_count{workflow_id="incidentFirstResp",status!="success"}[15m])) > 0
+          labels:
+            severity: warning
+            namespace: lab8-n8n
+          annotations:
+            summary: "Workflow incident first responder завершается с ошибкой"
+            description: "За 15 минут были неуспешные запуски. Смотреть выполнения в n8n: обычно это таймаут LLM или недоступный MCP-сервер."
+        # 2. Alertmanager не может доставить алерт в n8n: автоматизация молча не работает.
+        - alert: FirstResponderWebhookDeliveryFailing
+          expr: |
+            sum(increase(alertmanager_notifications_failed_total{integration="webhook"}[10m])) > 0
+          labels:
+            severity: critical
+            namespace: lab8-n8n
+          annotations:
+            summary: "Alertmanager не доставляет алерты в n8n"
+            description: "Ошибки отправки webhook за 10 минут: n8n недоступен или workflow не опубликован."
+        # 3. LLM недоступна или отвечает слишком долго — отчёт придёт поздно или не придёт.
+        - alert: FirstResponderLlmDegraded
+          expr: |
+            min_over_time(ollama_up[2m]) == 0
+            or
+            histogram_quantile(0.9, sum by (le) (rate(n8n_workflow_execution_duration_seconds_bucket{workflow_id="incidentFirstResp"}[30m]))) > 600
+          for: 2m
+          labels:
+            severity: warning
+            namespace: lab8-n8n
+          annotations:
+            summary: "LLM для first responder недоступна или слишком медленная"
+            description: "Ollama не отвечает или 90% запусков workflow дольше 10 минут: дежурный ждёт отчёт слишком долго."

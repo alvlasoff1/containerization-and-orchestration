@@ -1,0 +1,30 @@
+{{- if .Values.monitoring.linkerdProxy.enabled }}
+# Метрики sidecar-прокси Linkerd (порт linkerd-admin, /metrics) со всех
+# meshed pod'ов namespace. Метки pod'а переносятся в метрики, чтобы делить
+# трафик по deployment и версии.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ include "shop.fullname" . }}-linkerd-proxy
+  labels:
+    {{- include "shop.labels" . | nindent 4 }}
+spec:
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  selector:
+    matchExpressions:
+      - key: linkerd.io/control-plane-ns
+        operator: Exists
+  podMetricsEndpoints:
+    - port: linkerd-admin
+      path: /metrics
+      interval: {{ .Values.monitoring.serviceMonitor.interval }}
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_label_linkerd_io_proxy_deployment]
+          targetLabel: deployment
+        - sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_version]
+          targetLabel: version
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+{{- end }}

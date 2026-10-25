@@ -72,9 +72,3 @@ Add `ServiceMonitor`/`PrometheusRule` templates to the chart, reusing the stack 
 - The pod-chaos script and the hidden-fault script.
 - `README.md`: the CNI choice and why (Part 0); how a pod gets its network (Part 1); the continuity graph under pod chaos and why it worked, including the kube-proxy mode (Part 2); the target access matrix (Part 3); the final "expected/actual" matrix — green (Part 5); the hidden-break diagnosis — how you found and fixed it (Part 6); the 3 alerts and their rationale (Part 7).
 - Screenshots: pod networking (IP, veth); the "0 failed requests" graph against killed pods; the green access matrix; the traffic map with the found block; the dashboard.
-
-## How to start
-
-Open the repository with your AI assistant and ask for help with Lab 5. The assistant works step by step and checks your understanding; it won't hand you finished policies or chart templates.
-
-> Using AI? Make sure the assistant follows the rules in [`AGENTS.md`](../AGENTS.md). Most tools pick it up automatically; if not, point it at the file.

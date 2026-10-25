@@ -1,0 +1,413 @@
+# Дашборд lab8, генерируется scripts/build-dashboard.py
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lab8-dashboard
+  namespace: lab8-n8n
+  labels:
+    grafana_dashboard: "1"
+data:
+  lab8-first-responder.json: |-
+    {
+     "uid": "lab8-first-responder",
+     "title": "Incident first responder (n8n + AI)",
+     "timezone": "browser",
+     "schemaVersion": 39,
+     "refresh": "30s",
+     "time": {
+      "from": "now-1h",
+      "to": "now"
+     },
+     "tags": [
+      "lab8"
+     ],
+     "panels": [
+      {
+       "id": 1,
+       "type": "timeseries",
+       "title": "Запуски workflow по статусу (за 5 минут)",
+       "description": "Сколько раз отработал incident first responder и чем закончился запуск.",
+       "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+       },
+       "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+       },
+       "fieldConfig": {
+        "defaults": {
+         "unit": "short",
+         "min": 0,
+         "custom": {
+          "drawStyle": "bars",
+          "lineWidth": 2,
+          "fillOpacity": 60,
+          "showPoints": "never",
+          "stacking": {
+           "mode": "normal"
+          }
+         }
+        },
+        "overrides": []
+       },
+       "options": {
+        "legend": {
+         "displayMode": "list",
+         "placement": "bottom"
+        },
+        "tooltip": {
+         "mode": "multi"
+        }
+       },
+       "targets": [
+        {
+         "refId": "A",
+         "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+         },
+         "expr": "sum by (status) (increase(n8n_workflow_execution_duration_seconds_count{workflow_id=\"incidentFirstResp\"}[5m]))",
+         "legendFormat": "{{status}}"
+        }
+       ]
+      },
+      {
+       "id": 2,
+       "type": "timeseries",
+       "title": "Длительность запуска workflow",
+       "description": "Почти всё время — работа LLM на CPU.",
+       "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+       },
+       "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+       },
+       "fieldConfig": {
+        "defaults": {
+         "unit": "s",
+         "min": 0,
+         "custom": {
+          "drawStyle": "line",
+          "lineWidth": 2,
+          "fillOpacity": 10,
+          "showPoints": "never",
+          "stacking": {
+           "mode": "none"
+          }
+         }
+        },
+        "overrides": []
+       },
+       "options": {
+        "legend": {
+         "displayMode": "list",
+         "placement": "bottom"
+        },
+        "tooltip": {
+         "mode": "multi"
+        }
+       },
+       "targets": [
+        {
+         "refId": "A",
+         "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+         },
+         "expr": "sum(rate(n8n_workflow_execution_duration_seconds_sum{workflow_id=\"incidentFirstResp\"}[30m])) / sum(rate(n8n_workflow_execution_duration_seconds_count{workflow_id=\"incidentFirstResp\"}[30m]))",
+         "legendFormat": "среднее"
+        },
+        {
+         "refId": "B",
+         "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+         },
+         "expr": "histogram_quantile(0.9, sum by (le) (rate(n8n_workflow_execution_duration_seconds_bucket{workflow_id=\"incidentFirstResp\"}[30m])))",
+         "legendFormat": "p90"
+        }
+       ]
+      },
+      {
+       "id": 3,
+       "type": "timeseries",
+       "title": "Вызовы инструментов агентом (MCP Kubernetes)",
+       "description": "",
+       "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+       },
+       "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+       },
+       "fieldConfig": {
+        "defaults": {
+         "unit": "short",
+         "min": 0,
+         "custom": {
+          "drawStyle": "bars",
+          "lineWidth": 2,
+          "fillOpacity": 60,
+          "showPoints": "never",
+          "stacking": {
+           "mode": "normal"
+          }
+         }
+        },
+        "overrides": []
+       },
+       "options": {
+        "legend": {
+         "displayMode": "list",
+         "placement": "bottom"
+        },
+        "tooltip": {
+         "mode": "multi"
+        }
+       },
+       "targets": [
+        {
+         "refId": "A",
+         "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+         },
+         "expr": "sum by (tool_name) (increase(k8s_mcp_tool_calls_total{tool_name!~\"initialize|tools/list|ping\"}[5m]))",
+         "legendFormat": "{{tool_name}}"
+        }
+       ]
+      },
+      {
+       "id": 4,
+       "type": "timeseries",
+       "title": "Алерты, отправленные Alertmanager в n8n",
+       "description": "",
+       "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+       },
+       "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+       },
+       "fieldConfig": {
+        "defaults": {
+         "unit": "short",
+         "min": 0,
+         "custom": {
+          "drawStyle": "bars",
+          "lineWidth": 2,
+          "fillOpacity": 60,
+          "showPoints": "never",
+          "stacking": {
+           "mode": "normal"
+          }
+         }
+        },
+        "overrides": []
+       },
+       "options": {
+        "legend": {
+         "displayMode": "list",
+         "placement": "bottom"
+        },
+        "tooltip": {
+         "mode": "multi"
+        }
+       },
+       "targets": [
+        {
+         "refId": "A",
+         "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+         },
+         "expr": "sum(increase(alertmanager_notifications_total{integration=\"webhook\"}[5m]))",
+         "legendFormat": "отправлено"
+        },
+        {
+         "refId": "B",
+         "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+         },
+         "expr": "sum(increase(alertmanager_notifications_failed_total{integration=\"webhook\"}[5m]))",
+         "legendFormat": "ошибки доставки"
+        }
+       ]
+      },
+      {
+       "id": 5,
+       "type": "timeseries",
+       "title": "Ollama: память",
+       "description": "",
+       "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+       },
+       "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+       },
+       "fieldConfig": {
+        "defaults": {
+         "unit": "bytes",
+         "min": 0,
+         "custom": {
+          "drawStyle": "line",
+          "lineWidth": 2,
+          "fillOpacity": 10,
+          "showPoints": "never",
+          "stacking": {
+           "mode": "none"
+          }
+         }
+        },
+        "overrides": []
+       },
+       "options": {
+        "legend": {
+         "displayMode": "list",
+         "placement": "bottom"
+        },
+        "tooltip": {
+         "mode": "multi"
+        }
+       },
+       "targets": [
+        {
+         "refId": "A",
+         "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+         },
+         "expr": "sum by (model) (ollama_model_memory_bytes)",
+         "legendFormat": "модель {{model}}"
+        },
+        {
+         "refId": "B",
+         "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+         },
+         "expr": "sum(container_memory_working_set_bytes{namespace=\"lab8-n8n\",container=\"ollama\"})",
+         "legendFormat": "контейнер ollama"
+        }
+       ]
+      },
+      {
+       "id": 6,
+       "type": "timeseries",
+       "title": "Ollama: CPU и доступность",
+       "description": "",
+       "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+       },
+       "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+       },
+       "fieldConfig": {
+        "defaults": {
+         "unit": "short",
+         "min": 0,
+         "custom": {
+          "drawStyle": "line",
+          "lineWidth": 2,
+          "fillOpacity": 10,
+          "showPoints": "never",
+          "stacking": {
+           "mode": "none"
+          }
+         }
+        },
+        "overrides": []
+       },
+       "options": {
+        "legend": {
+         "displayMode": "list",
+         "placement": "bottom"
+        },
+        "tooltip": {
+         "mode": "multi"
+        }
+       },
+       "targets": [
+        {
+         "refId": "A",
+         "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+         },
+         "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"lab8-n8n\",container=\"ollama\"}[1m]))",
+         "legendFormat": "CPU, ядер"
+        },
+        {
+         "refId": "B",
+         "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+         },
+         "expr": "min(ollama_up)",
+         "legendFormat": "ollama_up"
+        }
+       ]
+      },
+      {
+       "id": 7,
+       "type": "table",
+       "title": "Сработавшие алерты lab8",
+       "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+       },
+       "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 5
+       },
+       "targets": [
+        {
+         "refId": "A",
+         "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+         },
+         "expr": "ALERTS{namespace=\"lab8-n8n\"}",
+         "instant": true,
+         "format": "table"
+        }
+       ],
+       "transformations": [
+        {
+         "id": "organize",
+         "options": {
+          "excludeByName": {
+           "Time": true,
+           "Value": true,
+           "__name__": true
+          }
+         }
+        }
+       ]
+      }
+     ]
+    }

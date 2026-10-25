@@ -1,0 +1,216 @@
+
+image:
+  registry: alvlasoff
+  pullPolicy: IfNotPresent
+database:
+  url: "postgres://shop:shop@shop-postgres-rw:5432/shop?sslmode=disable"
+
+spread:
+  mechanism: podAntiAffinity
+  # В lab5 api работает в 3 репликах на 2 рабочих нодах, поэтому разносим
+  # их мягко: при непрерывном убийстве pod'ов новая реплика не должна ждать,
+  # пока старая освободит ноду.
+  required: false
+  topologyKey: kubernetes.io/hostname
+
+priorityClasses:
+  critical:
+    name: shop-critical
+    value: 100000
+    description: "Critical shop workloads"
+  batch:
+    name: shop-batch
+    value: 100
+    description: "Background batch workload"
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
+api:
+  replicaCount: 3
+  image:
+    repository: api
+    tag: "0.0.7"
+  strategy:
+    maxUnavailable: 1
+    maxSurge: 1
+  service:
+    # Точка входа клиента снаружи кластера: http://<node-ip>:30080
+    type: NodePort
+    port: 80
+    nodePort: 30080
+  resources:
+    requests:
+      cpu: 250m
+      memory: 100Mi
+    limits:
+      cpu: 250m
+      memory: 100Mi
+  priorityClassName: shop-critical
+  pdb:
+    enabled: true
+    minAvailable: 1
+  healthFail: false
+  drainDelay: "5s"
+  terminationGracePeriodSeconds: 30
+
+worker:
+  replicaCount: 2
+  image:
+    repository: worker
+    tag: "0.0.1"
+  pollInterval: "2s"
+  priorityClassName: shop-critical
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+    limits:
+      memory: 100Mi
+  healthFail: false
+
+postgres:
+  priorityClassName: shop-critical
+  storageClass: standard
+  pdb:
+    enabled: true
+    minAvailable: 1
+  resources:
+    requests:
+      cpu: 500m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+batch:
+  enabled: false
+  replicaCount: 0
+  image:
+    repository: batch
+    tag: "0.0.1"
+  priorityClassName: shop-batch
+  burnCpus: 1
+  memMb: 64
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# Zero trust: матрица доступа из части 3. Все метки и порты задаются здесь,
+# шаблоны templates/networkpolicy-*.yaml только собирают из них правила.
+networkPolicy:
+  enabled: true
+  # 1. Запрет всего входящего и исходящего трафика для pod'ов namespace.
+  defaultDeny: true
+
+  # 3. DNS: любой pod namespace может ходить в CoreDNS (UDP/TCP 53).
+  dns:
+    enabled: true
+    namespaceLabels:
+      kubernetes.io/metadata.name: kube-system
+    podLabels:
+      k8s-app: kube-dns
+    port: 53
+
+  # Клиент внутри кластера (нагрузка, smoke-тесты): pod с этой меткой.
+  client:
+    podLabels:
+      shop.io/role: client
+
+  # client -> api. port — порт контейнера (targetPort), а не порт Service.
+  api:
+    podLabels:
+      app.kubernetes.io/component: api
+    port: 8080
+    # Внешние клиенты через NodePort. kube-proxy делает SNAT в router-IP ноды
+    # (cilium_host), и Cilium видит такой трафик как identity "world".
+    # CIDR-правила в Cilium не матчат pod'ы кластера, поэтому 0.0.0.0/0
+    # открывает api только для внешнего мира, а не для любого pod'а.
+    externalCIDRs:
+      - 0.0.0.0/0
+
+  worker:
+    podLabels:
+      app.kubernetes.io/component: worker
+
+  # api -> postgres, worker -> postgres
+  postgres:
+    podLabels:
+      cnpg.io/cluster: shop-postgres
+    port: 5432
+    clients:
+      - name: api
+        podLabels:
+          app.kubernetes.io/component: api
+      - name: worker
+        podLabels:
+          app.kubernetes.io/component: worker
+    # Служебный трафик CloudNativePG: оператор опрашивает instance manager
+    # (8000) и сам instance manager ходит в kube-apiserver.
+    operator:
+      namespaceLabels:
+        kubernetes.io/metadata.name: cnpg-system
+      podLabels:
+        app.kubernetes.io/name: cloudnative-pg
+      ports: [8000, 5432]
+    apiServerEgress: true
+
+  # Prometheus из lab2 снимает /metrics с api и worker.
+  monitoring:
+    namespaceLabels:
+      kubernetes.io/metadata.name: lab2-observability
+    podLabels:
+      app.kubernetes.io/name: prometheus
+    port: 8080
+
+monitoring:
+  serviceMonitor:
+    enabled: true
+    interval: 15s
+  # Сетевые метрики: Hubble (cilium-agent) и CoreDNS в kube-system.
+  network:
+    enabled: true
+    hubble:
+      namespace: kube-system
+      selector:
+        k8s-app: hubble
+      port: hubble-metrics
+    coredns:
+      namespace: kube-system
+      selector:
+        k8s-app: kube-dns
+      port: metrics
+  dashboard:
+    enabled: true
+  prometheusRule:
+    enabled: true
+    errorRatio: 0.01
+    forDuration: 1m
+    network:
+      # Как Hubble подписывает участников (метки source_/destination_*).
+      postgresApp: postgresql
+      postgresClients: "shop-api|shop-worker"
+      apiWorkload: shop-api
+      dnsWorkload: coredns
+      # Любой дроп политики на маршруте из матрицы — поломка.
+      allowedRouteDropsPerSec: 0
+      allowedRouteFor: 1m
+      # Доля DNS-ответов SERVFAIL/REFUSED или дропы DNS-запросов из namespace.
+      dnsErrorRatio: 0.05
+      dnsFor: 1m
+      # Попытки достучаться до PostgreSQL не из матрицы.
+      strayToPostgresFor: 1m

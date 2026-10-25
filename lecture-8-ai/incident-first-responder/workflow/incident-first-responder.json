@@ -1,0 +1,271 @@
+{
+  "id": "incidentFirstResp",
+  "name": "Incident first responder",
+  "active": false,
+  "nodes": [
+    {
+      "id": "n-webhook",
+      "name": "Alertmanager webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "6a0f6c1e-1b1e-4c55-9f4e-alert0000001",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "alert",
+        "responseMode": "onReceived",
+        "options": {}
+      }
+    },
+    {
+      "id": "n-parse",
+      "name": "Разобрать алерты",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Не-AI шаг: разбираем payload Alertmanager. Берём только firing-алерты,\n// достаём namespace, описание и PromQL-выражение из generatorURL.\nconst body = $input.first().json.body || {};\nconst out = [];\nfor (const a of body.alerts || []) {\n  if (a.status !== 'firing') continue;\n  const l = a.labels || {}, an = a.annotations || {};\n  // g0.expr из generatorURL: form-urlencoded, '+' означает пробел\n  const m = /[?&]g0\\.expr=([^&]*)/.exec(a.generatorURL || '');\n  const expr = m ? decodeURIComponent(m[1].replace(/\\+/g, ' ')).replace(/\\s+/g, ' ').trim() : '';\n  const ns = l.namespace || l.destination_namespace || l.source_namespace || 'default';\n  const prompt = [\n    `Alert: ${l.alertname} (severity: ${l.severity || 'none'})`,\n    `Namespace: ${ns}`,\n    `Summary: ${an.summary || ''}`,\n    `Description: ${an.description || ''}`,\n    `Started at: ${a.startsAt}`,\n    `PromQL expression of the alert: ${expr}`,\n    '',\n    'Plan, execute all four tool calls in this order:',\n    `1. pods_list_in_namespace with namespace \"${ns}\"`,\n    `2. events_list with namespace \"${ns}\" and fieldSelector \"type=Warning\"`,\n    `3. pods_log with namespace \"${ns}\", a pod name taken from step 1, container \"api\", tail 20`,\n    `4. execute_query with query: ${expr}`,\n    'Write the report only after the fourth tool result.',\n    '/no_think',\n  ].join('\\n');\n  out.push({ json: { alertname: l.alertname, namespace: ns, severity: l.severity || '',\n                     summary: an.summary || '', startsAt: a.startsAt, expr, prompt } });\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "n-agent",
+      "name": "AI-агент first responder",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        500,
+        0
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "options": {
+          "systemMessage": "You are an on-call first responder for a Kubernetes cluster. You investigate one alert and write a short report for the human on-call engineer. You can only read data, never change anything.\n\nYou always make exactly these four tool calls before writing anything. Call exactly ONE tool per message and wait for its result before the next call, because later calls depend on earlier results:\n1. pods_list_in_namespace for the alert namespace. Note pods that are not Running or not Ready, and pods with restarts.\n2. events_list for the alert namespace with fieldSelector \"type=Warning\".\n3. pods_log for ONE pod from the step 1 output that is most related to the alert (its name contains the service from the alert), with container \"api\" and tail 20.\n4. execute_query with the PromQL expression of the alert.\n\nRules:\n- Do not write the report until you have the results of all four tool calls.\n- Use only pod names and numbers that appear in tool output. Never invent anything.\n- pods_log needs an exact pod name. If pods_log failed because you did not know the name yet, call it again with a real pod name from the pods_list_in_namespace result.\n- If a tool returns an error or nothing, say so in the report and continue.\n\nReport format (English, Markdown), exactly these sections:\n### What is happening\nOne or two sentences.\n### Facts\n3-6 bullet points; each bullet ends with the tool it came from in brackets.\n### Likely cause\nOne or two sentences.\n### Next steps for on-call\nThree numbered concrete steps.",
+          "maxIterations": 8,
+          "returnIntermediateSteps": true
+        }
+      }
+    },
+    {
+      "id": "n-llm",
+      "name": "Ollama qwen3:1.7b",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        380,
+        240
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "qwen3:1.7b"
+        },
+        "responsesApiEnabled": false,
+        "options": {
+          "temperature": 0.1,
+          "maxTokens": 1500,
+          "maxRetries": 0,
+          "timeout": 900000
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "ollamaLab8",
+          "name": "Ollama (lab8, OpenAI API)"
+        }
+      }
+    },
+    {
+      "id": "n-mcp-k8s",
+      "name": "MCP Kubernetes",
+      "type": "@n8n/n8n-nodes-langchain.mcpClientTool",
+      "typeVersion": 1.4,
+      "position": [
+        560,
+        240
+      ],
+      "parameters": {
+        "endpointUrl": "http://mcp-kubernetes.lab8-n8n.svc:8080/mcp",
+        "serverTransport": "httpStreamable",
+        "include": "selected",
+        "includeTools": [
+          "pods_list_in_namespace",
+          "events_list",
+          "pods_log"
+        ],
+        "options": {
+          "timeout": 30000
+        }
+      }
+    },
+    {
+      "id": "n-mcp-prom",
+      "name": "MCP Prometheus",
+      "type": "@n8n/n8n-nodes-langchain.mcpClientTool",
+      "typeVersion": 1.4,
+      "position": [
+        740,
+        240
+      ],
+      "parameters": {
+        "endpointUrl": "http://mcp-prometheus.lab8-n8n.svc:8080/mcp",
+        "serverTransport": "httpStreamable",
+        "include": "selected",
+        "includeTools": [
+          "execute_query"
+        ],
+        "options": {
+          "timeout": 30000
+        }
+      }
+    },
+    {
+      "id": "n-build",
+      "name": "Собрать отчёт",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        820,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Не-AI шаг: собираем Markdown-отчёт и имя файла.\nconst alert = $('Разобрать алерты').item.json;\nconst ai = $json;\nconst steps = (ai.intermediateSteps || []).map((s, i) => {\n  const a = s.action || {};\n  return `${i + 1}. \\`${a.tool}\\` ${JSON.stringify(a.toolInput || {})}`;\n});\nconst ts = new Date().toISOString().replace(/[:.]/g, '-');\nconst fileName = `${ts}-${alert.alertname}.md`;\nconst report = [\n  `# ${alert.alertname} — ${alert.namespace}`,\n  '',\n  `- severity: ${alert.severity}`,\n  `- начало: ${alert.startsAt}`,\n  `- описание: ${alert.summary}`,\n  `- выражение: \\`${alert.expr}\\``,\n  '',\n  ai.output || '(агент не вернул ответ)',\n  '',\n  '---',\n  '#### Вызовы инструментов агентом',\n  steps.length ? steps.join('\\n') : '(нет)',\n  '',\n].join('\\n');\nreturn [{ json: { fileName, report, toolCalls: steps.length } }];"
+      }
+    },
+    {
+      "id": "n-tofile",
+      "name": "В файл",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1040,
+        0
+      ],
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "report",
+        "options": {
+          "fileName": "={{ $json.fileName }}"
+        }
+      }
+    },
+    {
+      "id": "n-write",
+      "name": "Сохранить отчёт",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1260,
+        0
+      ],
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/home/node/reports/{{ $('Собрать отчёт').item.json.fileName }}",
+        "dataPropertyName": "data",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Alertmanager webhook": {
+      "main": [
+        [
+          {
+            "node": "Разобрать алерты",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Разобрать алерты": {
+      "main": [
+        [
+          {
+            "node": "AI-агент first responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI-агент first responder": {
+      "main": [
+        [
+          {
+            "node": "Собрать отчёт",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Собрать отчёт": {
+      "main": [
+        [
+          {
+            "node": "В файл",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "В файл": {
+      "main": [
+        [
+          {
+            "node": "Сохранить отчёт",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama qwen3:1.7b": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI-агент first responder",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP Kubernetes": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI-агент first responder",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP Prometheus": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI-агент first responder",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}
