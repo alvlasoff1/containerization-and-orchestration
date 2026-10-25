@@ -1,0 +1,27 @@
+# Постоянный клиент в mesh: fortio шлёт POST /order на shop-api с
+# фиксированной частотой. Retries и traffic split выполняет его прокси.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loadgen
+  namespace: lab6-mesh
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: loadgen}
+  template:
+    metadata:
+      labels: {app: loadgen}
+      annotations:
+        linkerd.io/inject: enabled
+    spec:
+      serviceAccountName: shop-client
+      containers:
+        - name: fortio
+          image: fortio/fortio:1.69.4
+          args: ["load", "-qps", "20", "-c", "4", "-t", "0", "-timeout", "3s",
+                 "-content-type", "application/json", "-payload", '{"item":"book","quantity":1}',
+                 "-allow-initial-errors",
+                 "http://shop-api.lab6-mesh.svc.cluster.local/order"]
+          resources:
+            requests: {cpu: 50m, memory: 32Mi}

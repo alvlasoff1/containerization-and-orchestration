@@ -1,0 +1,43 @@
+{
+  "receiver": "n8n-first-responder",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "ShopRetriesMaskingFailures",
+        "namespace": "lab6-mesh",
+        "prometheus": "lab2-observability/prometheus-operator-kube-p-prometheus",
+        "severity": "warning"
+      },
+      "annotations": {
+        "description": "Больше 0.1 попыток к backend заканчиваются 5xx. Клиент может этого не видеть, но запас retries тратится.",
+        "summary": "Backend api падает, retries это маскируют"
+      },
+      "startsAt": "2026-10-25T13:56:30.729Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://prometheus-operator-kube-p-prometheus.lab2-observability:9090/graph?g0.expr=sum%28rate%28outbound_http_route_backend_response_statuses_total%7Bhttp_status%3D~%225..%22%2Cnamespace%3D%22lab6-mesh%22%2Cparent_name%3D%22shop-api%22%7D%5B5m%5D%29%29+%2F+sum%28rate%28outbound_http_route_backend_response_statuses_total%7Bnamespace%3D%22lab6-mesh%22%2Cparent_name%3D%22shop-api%22%7D%5B5m%5D%29%29+%3E+0.1&g0.tab=1",
+      "fingerprint": "b099a675c3719fbb"
+    }
+  ],
+  "notification_reason": "first notification",
+  "groupLabels": {
+    "alertname": "ShopRetriesMaskingFailures",
+    "namespace": "lab6-mesh"
+  },
+  "commonLabels": {
+    "alertname": "ShopRetriesMaskingFailures",
+    "namespace": "lab6-mesh",
+    "prometheus": "lab2-observability/prometheus-operator-kube-p-prometheus",
+    "severity": "warning"
+  },
+  "commonAnnotations": {
+    "description": "Больше 0.1 попыток к backend заканчиваются 5xx. Клиент может этого не видеть, но запас retries тратится.",
+    "summary": "Backend api падает, retries это маскируют"
+  },
+  "routeLabels": {},
+  "externalURL": "http://prometheus-operator-kube-p-alertmanager.lab2-observability:9093",
+  "version": "4",
+  "groupKey": "{}/{namespace=\"lab6-mesh\",severity=~\"critical|warning\"}:{alertname=\"ShopRetriesMaskingFailures\", namespace=\"lab6-mesh\"}",
+  "truncatedAlerts": 0
+}

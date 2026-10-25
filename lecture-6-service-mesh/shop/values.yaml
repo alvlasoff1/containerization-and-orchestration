@@ -1,0 +1,131 @@
+
+database:
+  url: "postgres://shop:shop@shop-postgres-rw:5432/shop?sslmode=disable"
+
+priorityClasses:
+  critical:
+    name: shop6-critical
+    value: 100000
+    description: "Critical shop workloads"
+  batch:
+    name: shop6-batch
+    value: 100
+    description: "Background batch workload"
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
+api:
+  # Один образ на обе версии: версия и поведение задаются через env.
+  image:
+    repository: shop-api
+    tag: lab6
+    pullPolicy: IfNotPresent
+  service:
+    # Общая точка входа: выбирает pod'ы всех версий.
+    type: NodePort
+    port: 80
+    nodePort: 30081
+  versions:
+    v1:
+      enabled: true
+      replicaCount: 2
+      env:
+        FLAKY: "false"
+        FLAKY_RATE: "0.3"
+    v2:
+      enabled: false
+      replicaCount: 2
+      env:
+        FAIL: "false"
+  resources:
+    requests:
+      cpu: 250m
+      memory: 100Mi
+    limits:
+      cpu: 250m
+      memory: 100Mi
+  priorityClassName: shop6-critical
+  pdb:
+    enabled: true
+    minAvailable: 1
+  drainDelay: "5s"
+  terminationGracePeriodSeconds: 30
+
+worker:
+  enabled: false
+
+postgres:
+  priorityClassName: shop6-critical
+  storageClass: standard
+  pdb:
+    enabled: true
+    minAvailable: 1
+  resources:
+    requests:
+      cpu: 500m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# Service mesh (Linkerd). Только вокруг api и его клиентов.
+mesh:
+  enabled: true
+  podAnnotations:
+    linkerd.io/inject: enabled
+  # Повторы на стороне клиентского прокси (Linkerd retries).
+  retries:
+    enabled: true
+    statuses: "5xx"
+    limit: 3
+    timeout: "2s"
+  # Circuit breaking: прокси временно исключает backend после N ошибок подряд.
+  failureAccrual:
+    enabled: false
+    consecutiveMaxFailures: 7
+
+# Traffic split между версиями — HTTPRoute (Gateway API), который
+# выполняет Linkerd. Вес v1 считается как 100 - v2.
+trafficSplit:
+  enabled: false
+  v2Weight: 10
+
+# Canary gate (gate/gate.py): раз в INTERVAL секунд проверяет v2 и двигает вес.
+gate:
+  enabled: false
+  image:
+    repository: shop-gate
+    tag: lab6
+  env:
+    INTERVAL: "15"
+    STEP: "10"
+    MIN_RPS: "0.5"
+    MAX_ERROR_RATIO: "0.05"
+    MAX_P95_SECONDS: "0.3"
+    WINDOW: "30s"
+
+monitoring:
+  serviceMonitor:
+    enabled: true
+    interval: 15s
+  # Метрики прокси Linkerd (порт linkerd-admin 4191) — PodMonitor.
+  linkerdProxy:
+    enabled: true
+  dashboard:
+    enabled: true
+  prometheusRule:
+    enabled: true
+    canaryErrorRatio: 0.05
+    canaryFor: 30s
+    clientErrorRatio: 0.01
+    clientFor: 2m
+    backendErrorRatio: 0.10
+    backendFor: 3m

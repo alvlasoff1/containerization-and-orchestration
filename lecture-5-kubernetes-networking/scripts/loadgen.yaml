@@ -1,0 +1,40 @@
+# Фоновый клиент: ~2 заказа в секунду через Service shop-api по DNS-имени.
+# Метка shop.io/role=client — та же, что в матрице доступа.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop-loadgen
+  namespace: lab5-networking
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: shop-loadgen}
+  template:
+    metadata:
+      labels:
+        app: shop-loadgen
+        shop.io/role: client
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: loadgen
+          image: curlimages/curl:8.10.1
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {memory: 32Mi}
+          command: ["sh", "-c"]
+          args:
+            - |
+              while true; do
+                code=$(curl -s -o /dev/null -w '%{http_code}' -m 3 -X POST \
+                  -H 'Content-Type: application/json' -d '{"item":"book","quantity":1}' \
+                  http://shop-api.lab5-networking.svc.cluster.local/order)
+                echo "$(date +%T) $code"
+                sleep 0.5
+              done

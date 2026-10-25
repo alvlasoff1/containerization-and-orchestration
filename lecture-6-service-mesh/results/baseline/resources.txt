@@ -1,0 +1,4 @@
+# CPU, millicores (avg over 121s, sum over api pods, by container)
+api	143.9195634601603
+# Memory working set, MiB (sum over api pods, by container)
+api	18.67640904017857

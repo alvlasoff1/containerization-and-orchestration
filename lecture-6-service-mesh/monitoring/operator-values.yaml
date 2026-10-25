@@ -1,0 +1,98 @@
+# Тот же kube-prometheus-stack, что в lab3/lab4/lab5 (release prometheus-operator в
+# lab2-observability). Отличия: включён alertmanager,
+# retention чуть больше, kubelet/cAdvisor для CPU и памяти контейнеров.
+crds:
+  enabled: true
+
+defaultRules:
+  create: false
+
+grafana:
+  enabled: false
+
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        memory: 64Mi
+
+kubeStateMetrics:
+  enabled: false
+
+nodeExporter:
+  enabled: false
+
+kubeApiServer:
+  enabled: false
+
+kubeControllerManager:
+  enabled: false
+
+kubeScheduler:
+  enabled: false
+
+kubeProxy:
+  enabled: false
+
+kubeEtcd:
+  enabled: false
+
+kubelet:
+  # cAdvisor: CPU и память контейнеров (замер стоимости sidecar в lab6)
+  enabled: true
+  serviceMonitor:
+    cAdvisor: true
+    probes: false
+    resource: false
+
+coreDns:
+  enabled: false
+
+prometheusOperator:
+  enabled: true
+  tls:
+    enabled: false
+  admissionWebhooks:
+    enabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  prometheusConfigReloader:
+    resources:
+      requests:
+        cpu: 20m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+
+prometheus:
+  enabled: true
+  prometheusSpec:
+    retention: 12h
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelector: {}
+    ruleSelector: {}
+    serviceMonitorNamespaceSelector: {}
+    ruleNamespaceSelector: {}
+    podMonitorSelector: {}
+    podMonitorNamespaceSelector: {}
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 768Mi

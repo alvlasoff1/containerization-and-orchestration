@@ -1,0 +1,440 @@
+{
+ "uid": "shop-network",
+ "title": "Shop — сеть и zero trust",
+ "timezone": "browser",
+ "schemaVersion": 39,
+ "refresh": "30s",
+ "time": {
+  "from": "now-30m",
+  "to": "now"
+ },
+ "tags": [
+  "shop",
+  "lab5"
+ ],
+ "panels": [
+  {
+   "id": 1,
+   "type": "timeseries",
+   "title": "Заказы: созданы / обработаны в секунду",
+   "description": "Симптом для части 6: если обработка упала до нуля при живом создании — сломан маршрут worker -> postgres.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "ops",
+     "min": 0,
+     "custom": {
+      "lineWidth": 2,
+      "fillOpacity": 10,
+      "stacking": {
+       "mode": "none"
+      },
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum(rate(shop_orders_created_total{namespace=\"__NS__\"}[1m]))",
+     "legendFormat": "создано (api)"
+    },
+    {
+     "refId": "B",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum(rate(shop_orders_processed_total{namespace=\"__NS__\"}[1m]))",
+     "legendFormat": "обработано (worker)"
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "type": "timeseries",
+   "title": "POST /order по статусам",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 0,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "reqps",
+     "min": 0,
+     "custom": {
+      "lineWidth": 2,
+      "fillOpacity": 10,
+      "stacking": {
+       "mode": "none"
+      },
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (status) (rate(http_request_duration_seconds_count{namespace=\"__NS__\",path=\"/order\"}[1m]))",
+     "legendFormat": "{{status}}"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "type": "timeseries",
+   "title": "Дропы политик (POLICY_DENIED): источник → назначение",
+   "description": "Трафик, отклонённый NetworkPolicy, по парам источник → назначение. world — источник вне кластера (NodePort).",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 8,
+    "w": 24,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "pps",
+     "min": 0,
+     "custom": {
+      "lineWidth": 2,
+      "fillOpacity": 10,
+      "stacking": {
+       "mode": "none"
+      },
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (src, dst) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(rate(hubble_drop_total{reason=\"POLICY_DENIED\",destination_namespace=\"__NS__\"}[1m]), \"src\", \"unlabeled pod\", \"source_namespace\", \"(.+)\"), \"src\", \"$1\", \"source_app\", \"(.+)\"), \"src\", \"$1\", \"source_workload\", \"(.+)\"), \"src\", \"world\", \"source_namespace\", \"\"), \"dst\", \"$1\", \"destination_app\", \"(.+)\"), \"dst\", \"$1\", \"destination_workload\", \"(.+)\"))",
+     "legendFormat": "{{src}} → {{dst}}"
+    },
+    {
+     "refId": "B",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (src, dst) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(rate(hubble_drop_total{reason=\"POLICY_DENIED\",source_namespace=\"__NS__\",destination_namespace!=\"__NS__\"}[1m]), \"src\", \"unlabeled pod\", \"source_namespace\", \"(.+)\"), \"src\", \"$1\", \"source_app\", \"(.+)\"), \"src\", \"$1\", \"source_workload\", \"(.+)\"), \"src\", \"world\", \"source_namespace\", \"\"), \"dst\", \"$1\", \"destination_app\", \"(.+)\"), \"dst\", \"$1\", \"destination_workload\", \"(.+)\"))",
+     "legendFormat": "{{src}} → {{dst}} (вне namespace)"
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "type": "timeseries",
+   "title": "Новые TCP-соединения (SYN) к pod'ам shop",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 16,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "cps",
+     "min": 0,
+     "custom": {
+      "lineWidth": 2,
+      "fillOpacity": 10,
+      "stacking": {
+       "mode": "none"
+      },
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (src, dst) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(rate(hubble_tcp_flags_total{flag=\"SYN\",destination_namespace=\"__NS__\",destination_workload!=\"\"}[1m]), \"src\", \"unlabeled pod\", \"source_namespace\", \"(.+)\"), \"src\", \"$1\", \"source_app\", \"(.+)\"), \"src\", \"$1\", \"source_workload\", \"(.+)\"), \"src\", \"world\", \"source_namespace\", \"\"), \"dst\", \"$1\", \"destination_app\", \"(.+)\"), \"dst\", \"$1\", \"destination_workload\", \"(.+)\"))",
+     "legendFormat": "{{src}} → {{dst}}"
+    },
+    {
+     "refId": "B",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (src, dst) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(rate(hubble_tcp_flags_total{flag=\"SYN\",destination_namespace=\"__NS__\",destination_workload=\"\",destination_app!=\"\"}[1m]), \"src\", \"unlabeled pod\", \"source_namespace\", \"(.+)\"), \"src\", \"$1\", \"source_app\", \"(.+)\"), \"src\", \"$1\", \"source_workload\", \"(.+)\"), \"src\", \"world\", \"source_namespace\", \"\"), \"dst\", \"$1\", \"destination_app\", \"(.+)\"), \"dst\", \"$1\", \"destination_workload\", \"(.+)\"))",
+     "legendFormat": "{{src}} → {{dst}}"
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "type": "timeseries",
+   "title": "Вердикты политик в namespace",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 16,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "pps",
+     "min": 0,
+     "custom": {
+      "lineWidth": 2,
+      "fillOpacity": 10,
+      "stacking": {
+       "mode": "none"
+      },
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (action, direction) (rate(hubble_policy_verdicts_total{destination_namespace=\"__NS__\"}[1m]))",
+     "legendFormat": "{{direction}} {{action}}"
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "type": "timeseries",
+   "title": "DNS: ответы CoreDNS по rcode",
+   "description": "NXDOMAIN — это норма из-за ndots:5 и search-доменов; тревожны SERVFAIL/REFUSED.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 24,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "reqps",
+     "min": 0,
+     "custom": {
+      "lineWidth": 2,
+      "fillOpacity": 10,
+      "stacking": {
+       "mode": "none"
+      },
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (rcode) (rate(coredns_dns_responses_total[1m]))",
+     "legendFormat": "{{rcode}}"
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "type": "timeseries",
+   "title": "DNS: запросы из shop, отклонённые политикой",
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 24,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "pps",
+     "min": 0,
+     "custom": {
+      "lineWidth": 2,
+      "fillOpacity": 10,
+      "stacking": {
+       "mode": "none"
+      },
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom"
+    },
+    "tooltip": {
+     "mode": "multi"
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (src) (label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(rate(hubble_drop_total{reason=\"POLICY_DENIED\",source_namespace=\"__NS__\",destination_workload=\"coredns\"}[1m]), \"src\", \"unlabeled pod\", \"source_namespace\", \"(.+)\"), \"src\", \"$1\", \"source_app\", \"(.+)\"), \"src\", \"$1\", \"source_workload\", \"(.+)\"), \"src\", \"world\", \"source_namespace\", \"\"), \"dst\", \"$1\", \"destination_app\", \"(.+)\"), \"dst\", \"$1\", \"destination_workload\", \"(.+)\"))",
+     "legendFormat": "{{src}} → coredns"
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "type": "table",
+   "title": "Сработавшие алерты shop",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 32,
+    "w": 24,
+    "h": 6
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "ALERTS{alertname=~\"Shop.*\"}",
+     "instant": true,
+     "format": "table"
+    }
+   ],
+   "transformations": [
+    {
+     "id": "organize",
+     "options": {
+      "excludeByName": {
+       "Time": true,
+       "Value": true,
+       "__name__": true
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

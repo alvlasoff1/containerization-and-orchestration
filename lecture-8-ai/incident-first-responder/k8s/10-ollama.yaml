@@ -1,0 +1,83 @@
+# Локальная LLM: Ollama (CPU) с моделью на PVC. Всё закреплено на одной
+# ноде, чтобы образ и модель не скачивались на каждую ноду kind.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lab8-n8n
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-models
+  namespace: lab8-n8n
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: lab8-n8n
+  labels: {app: ollama}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: ollama}
+  template:
+    metadata:
+      labels: {app: ollama}
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: lab5-worker2
+      containers:
+        - name: ollama
+          image: ollama-cpu:0.40.11
+          imagePullPolicy: Never
+          env:
+            # модель выгружается через 5 минут простоя: на 8 GB хосте с
+            # кластером kind память нужна остальным компонентам
+            - name: OLLAMA_KEEP_ALIVE
+              value: "5m"
+            # KV-кэш в 8 бит + flash attention: вдвое меньше памяти на контекст
+            - name: OLLAMA_FLASH_ATTENTION
+              value: "1"
+            - name: OLLAMA_KV_CACHE_TYPE
+              value: "q8_0"
+            - name: OLLAMA_NUM_PARALLEL
+              value: "1"
+            - name: OLLAMA_CONTEXT_LENGTH
+              value: "8192"
+          ports:
+            - name: http
+              containerPort: 11434
+          readinessProbe:
+            httpGet: {path: /api/version, port: http}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: "1", memory: 2560Mi}
+            limits: {cpu: "3", memory: 3584Mi}
+          volumeMounts:
+            - name: models
+              mountPath: /models
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: ollama-models
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+  namespace: lab8-n8n
+  labels: {app: ollama}
+spec:
+  selector: {app: ollama}
+  ports:
+    - name: http
+      port: 11434
+      targetPort: http

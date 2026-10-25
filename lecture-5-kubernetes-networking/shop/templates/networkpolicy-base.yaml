@@ -1,0 +1,45 @@
+{{- $np := .Values.networkPolicy }}
+{{- if $np.enabled }}
+{{- if $np.defaultDeny }}
+# 1. default-deny: pod'ы namespace не принимают и не отправляют ничего,
+# пока это явно не разрешено политиками ниже.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "shop.fullname" . }}-default-deny
+  labels:
+    {{- include "shop.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+{{- end }}
+{{- if $np.dns.enabled }}
+---
+# 3. DNS: без него сервисы не находят друг друга по имени.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "shop.fullname" . }}-allow-dns
+  labels:
+    {{- include "shop.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml $np.dns.namespaceLabels | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml $np.dns.podLabels | nindent 14 }}
+      ports:
+        - protocol: UDP
+          port: {{ $np.dns.port }}
+        - protocol: TCP
+          port: {{ $np.dns.port }}
+{{- end }}
+{{- end }}

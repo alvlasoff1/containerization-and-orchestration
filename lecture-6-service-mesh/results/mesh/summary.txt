@@ -1,0 +1,5 @@
+latency p50 11.6 ms
+latency p90 18.8 ms
+latency p99 37.9 ms
+Code 201 : 12000 (100.0 %)
+All done 12000 calls (plus 8 warmup) 11.851 ms avg, 100.0 qps

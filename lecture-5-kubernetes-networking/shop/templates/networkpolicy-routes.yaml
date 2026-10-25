@@ -1,0 +1,188 @@
+{{- $np := .Values.networkPolicy }}
+{{- if $np.enabled }}
+# 2. Маршруты из матрицы доступа. Каждое правило описано с обеих сторон:
+# egress у источника и ingress у получателя, иначе default-deny отрежет
+# одну из половин соединения.
+
+# client -> api (и Prometheus -> api:/metrics)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "shop.fullname" . }}-api-ingress
+  labels:
+    {{- include "shop.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- toYaml $np.api.podLabels | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- toYaml $np.client.podLabels | nindent 14 }}
+        {{- range $np.api.externalCIDRs }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ $np.api.port }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml $np.monitoring.namespaceLabels | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml $np.monitoring.podLabels | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ $np.monitoring.port }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "shop.fullname" . }}-client-egress
+  labels:
+    {{- include "shop.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- toYaml $np.client.podLabels | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- toYaml $np.api.podLabels | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ $np.api.port }}
+---
+# worker никто не вызывает, кроме Prometheus.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "shop.fullname" . }}-worker-ingress
+  labels:
+    {{- include "shop.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- toYaml $np.worker.podLabels | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml $np.monitoring.namespaceLabels | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml $np.monitoring.podLabels | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ $np.monitoring.port }}
+{{- range $np.postgres.clients }}
+---
+# {{ .name }} -> postgres (egress со стороны клиента)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "shop.fullname" $ }}-{{ .name }}-to-postgres
+  labels:
+    {{- include "shop.labels" $ | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- toYaml .podLabels | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- toYaml $np.postgres.podLabels | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ $np.postgres.port }}
+{{- end }}
+---
+# postgres принимает только клиентов из матрицы, оператор CNPG и свои реплики.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "shop.fullname" . }}-postgres
+  labels:
+    {{- include "shop.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- toYaml $np.postgres.podLabels | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        {{- range $np.postgres.clients }}
+        - podSelector:
+            matchLabels:
+              {{- toYaml .podLabels | nindent 14 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ $np.postgres.port }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              {{- toYaml $np.postgres.operator.namespaceLabels | nindent 14 }}
+          podSelector:
+            matchLabels:
+              {{- toYaml $np.postgres.operator.podLabels | nindent 14 }}
+      ports:
+        {{- range $np.postgres.operator.ports }}
+        - protocol: TCP
+          port: {{ . }}
+        {{- end }}
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- toYaml $np.postgres.podLabels | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ $np.postgres.port }}
+        - protocol: TCP
+          port: 8000
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- toYaml $np.postgres.podLabels | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ $np.postgres.port }}
+        - protocol: TCP
+          port: 8000
+{{- if $np.postgres.apiServerEgress }}
+---
+# instance manager CloudNativePG читает свой Cluster из kube-apiserver.
+# В стандартном NetworkPolicy apiserver можно описать только через ipBlock,
+# а Cilium относит адреса нод к отдельным identity, поэтому здесь
+# CiliumNetworkPolicy с entity kube-apiserver.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ include "shop.fullname" . }}-postgres-apiserver
+  labels:
+    {{- include "shop.labels" . | nindent 4 }}
+spec:
+  endpointSelector:
+    matchLabels:
+      {{- toYaml $np.postgres.podLabels | nindent 6 }}
+  egress:
+    - toEntities:
+        - kube-apiserver
+{{- end }}
+{{- end }}

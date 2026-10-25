@@ -1,0 +1,4 @@
+{"event": "start", "route": "shop-api-split", "step": 10, "max_error_ratio": 0.05, "max_p95_s": 0.3, "interval_s": 15, "ts": "12:03:59"}
+{"event": "hold", "reason": "not enough v2 traffic", "weight": 10, "v2_rps": 0, "v2_error_ratio": null, "v2_p95_s": null, "ts": "12:04:14"}
+{"event": "hold", "reason": "not enough v2 traffic", "weight": 10, "v2_rps": 0.13, "v2_error_ratio": 1.0, "v2_p95_s": 0.001, "ts": "12:04:29"}
+{"event": "rollback", "reason": "v2 unhealthy", "new_weight": 0, "weight": 10, "v2_rps": 2.79, "v2_error_ratio": 1.0, "v2_p95_s": 0.001, "ts": "12:04:44"}

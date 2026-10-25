@@ -1,0 +1,127 @@
+# Два MCP-сервера, через которые AI-агент смотрит на внешние системы.
+# 1. kubernetes-mcp-server — только чтение (read_only, toolset core),
+#    ServiceAccount с правами view.
+# 2. prometheus-mcp-server — PromQL-запросы к Prometheus из lab2.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mcp-kubernetes
+  namespace: lab8-n8n
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: lab8-mcp-kubernetes-view
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+  - kind: ServiceAccount
+    name: mcp-kubernetes
+    namespace: lab8-n8n
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-kubernetes-config
+  namespace: lab8-n8n
+data:
+  config.toml: |
+    port = "8080"
+    metrics_port = "9090"
+    stateless = true
+    read_only = true
+    toolsets = ["core"]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-kubernetes
+  namespace: lab8-n8n
+  labels: {app: mcp-kubernetes}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: mcp-kubernetes}
+  template:
+    metadata:
+      labels: {app: mcp-kubernetes}
+    spec:
+      serviceAccountName: mcp-kubernetes
+      nodeSelector:
+        kubernetes.io/hostname: lab5-worker2
+      containers:
+        - name: mcp
+          image: quay.io/containers/kubernetes_mcp_server:latest
+          args: ["--config", "/etc/mcp/config.toml"]
+          ports:
+            - {name: mcp, containerPort: 8080}
+            - {name: metrics, containerPort: 9090}
+          readinessProbe:
+            httpGet: {path: /healthz, port: metrics}
+          resources:
+            requests: {cpu: 20m, memory: 32Mi}
+            limits: {memory: 128Mi}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/mcp
+      volumes:
+        - name: config
+          configMap:
+            name: mcp-kubernetes-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-kubernetes
+  namespace: lab8-n8n
+  labels: {app: mcp-kubernetes}
+spec:
+  selector: {app: mcp-kubernetes}
+  ports:
+    - {name: mcp, port: 8080, targetPort: mcp}
+    - {name: metrics, port: 9090, targetPort: metrics}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-prometheus
+  namespace: lab8-n8n
+  labels: {app: mcp-prometheus}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: mcp-prometheus}
+  template:
+    metadata:
+      labels: {app: mcp-prometheus}
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: lab5-worker2
+      containers:
+        - name: mcp
+          image: ghcr.io/pab1it0/prometheus-mcp-server:latest
+          env:
+            - {name: PROMETHEUS_URL, value: "http://prometheus-operated.lab2-observability.svc:9090"}
+            - {name: PROMETHEUS_MCP_SERVER_TRANSPORT, value: "http"}
+            - {name: PROMETHEUS_MCP_BIND_HOST, value: "0.0.0.0"}
+            - {name: PROMETHEUS_MCP_BIND_PORT, value: "8080"}
+            - {name: PROMETHEUS_MCP_STATELESS_HTTP, value: "true"}
+            - {name: PROMETHEUS_DISABLE_LINKS, value: "true"}
+          ports:
+            - {name: mcp, containerPort: 8080}
+          resources:
+            requests: {cpu: 20m, memory: 64Mi}
+            limits: {memory: 256Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-prometheus
+  namespace: lab8-n8n
+  labels: {app: mcp-prometheus}
+spec:
+  selector: {app: mcp-prometheus}
+  ports:
+    - {name: mcp, port: 8080, targetPort: mcp}

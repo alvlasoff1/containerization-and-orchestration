@@ -1,0 +1,13 @@
+{"event": "start", "route": "shop-api-split", "step": 10, "max_error_ratio": 0.05, "max_p95_s": 0.3, "interval_s": 15, "ts": "12:06:33"}
+{"event": "hold", "reason": "not enough v2 traffic", "weight": 10, "v2_rps": 0, "v2_error_ratio": null, "v2_p95_s": null, "ts": "12:06:49"}
+{"event": "hold", "reason": "not enough v2 traffic", "weight": 10, "v2_rps": 0, "v2_error_ratio": null, "v2_p95_s": null, "ts": "12:07:04"}
+{"event": "promote", "new_weight": 20, "weight": 10, "v2_rps": 2.57, "v2_error_ratio": null, "v2_p95_s": 0.009, "ts": "12:07:19"}
+{"event": "promote", "new_weight": 30, "weight": 20, "v2_rps": 3.13, "v2_error_ratio": null, "v2_p95_s": 0.012, "ts": "12:07:34"}
+{"event": "promote", "new_weight": 40, "weight": 30, "v2_rps": 3.93, "v2_error_ratio": null, "v2_p95_s": 0.013, "ts": "12:07:49"}
+{"event": "promote", "new_weight": 50, "weight": 40, "v2_rps": 6.8, "v2_error_ratio": null, "v2_p95_s": 0.011, "ts": "12:08:04"}
+{"event": "promote", "new_weight": 60, "weight": 50, "v2_rps": 8.73, "v2_error_ratio": null, "v2_p95_s": 0.017, "ts": "12:08:19"}
+{"event": "promote", "new_weight": 70, "weight": 60, "v2_rps": 11.2, "v2_error_ratio": null, "v2_p95_s": 0.01, "ts": "12:08:34"}
+{"event": "promote", "new_weight": 80, "weight": 70, "v2_rps": 12.73, "v2_error_ratio": null, "v2_p95_s": 0.012, "ts": "12:08:49"}
+{"event": "promote", "new_weight": 90, "weight": 80, "v2_rps": 14.8, "v2_error_ratio": null, "v2_p95_s": 0.011, "ts": "12:09:04"}
+{"event": "promote", "new_weight": 100, "weight": 90, "v2_rps": 16.8, "v2_error_ratio": null, "v2_p95_s": 0.01, "ts": "12:09:19"}
+{"event": "done", "reason": "v2 takes 100% of traffic", "ts": "12:09:19"}

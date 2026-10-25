@@ -1,0 +1,77 @@
+{{- if .Values.monitoring.prometheusRule.enabled }}
+{{- $r := .Values.monitoring.prometheusRule }}
+{{- $n := $r.network }}
+{{- $ns := .Release.Namespace }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "shop.fullname" . }}-rules
+  labels:
+    {{- include "shop.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: shop-network
+      rules:
+        # 1. Разрешённый матрицей маршрут режется политикой: api/worker -> postgres
+        #    или внешний клиент -> api. Это не атака, а сломанное allow-правило.
+        - alert: ShopAllowedRouteBlocked
+          expr: |
+            (
+              sum by (source_workload, source_app, destination_workload, destination_app) (
+                rate(hubble_drop_total{reason="POLICY_DENIED",source_namespace="{{ $ns }}",source_workload=~"{{ $n.postgresClients }}",destination_app="{{ $n.postgresApp }}"}[2m])
+              )
+              or
+              sum by (source_workload, source_app, destination_workload, destination_app) (
+                rate(hubble_drop_total{reason="POLICY_DENIED",destination_namespace="{{ $ns }}",destination_workload="{{ $n.apiWorkload }}",source_namespace=""}[2m])
+              )
+            ) > {{ $n.allowedRouteDropsPerSec }}
+          for: {{ $n.allowedRouteFor }}
+          labels:
+            severity: critical
+          annotations:
+            summary: "NetworkPolicy режет разрешённый маршрут"
+            description: "{{ `{{ $labels.source_workload }}{{ $labels.source_app }} -> {{ $labels.destination_workload }}{{ $labels.destination_app }}` }}: дропы POLICY_DENIED на маршруте из матрицы. Смотреть hubble observe --verdict DROPPED и values.yaml networkPolicy."
+        # 2. DNS: запросы из namespace режутся политикой или CoreDNS отвечает ошибками.
+        - alert: ShopDnsDegraded
+          expr: |
+            sum(rate(hubble_drop_total{reason="POLICY_DENIED",source_namespace="{{ $ns }}",destination_workload="{{ $n.dnsWorkload }}"}[2m])) > 0
+            or
+            (
+              sum(rate(coredns_dns_responses_total{rcode=~"SERVFAIL|REFUSED"}[5m]))
+              /
+              sum(rate(coredns_dns_responses_total[5m]))
+            ) > {{ $n.dnsErrorRatio }}
+          for: {{ $n.dnsFor }}
+          labels:
+            severity: critical
+          annotations:
+            summary: "DNS для shop не работает"
+            description: "Pod'ы {{ $ns }} не могут резолвить имена: дропы до CoreDNS или доля SERVFAIL/REFUSED выше {{ $n.dnsErrorRatio }}."
+        # 3. Кто-то вне матрицы стучится в PostgreSQL — признак лишнего pod'а
+        #    или попытки бокового перемещения.
+        - alert: ShopUnexpectedAccessToPostgres
+          expr: |
+            sum by (source_namespace, source_workload, source_app) (
+              rate(hubble_drop_total{reason="POLICY_DENIED",destination_namespace="{{ $ns }}",destination_app="{{ $n.postgresApp }}",source_workload!~"{{ $n.postgresClients }}"}[2m])
+            ) > 0
+          for: {{ $n.strayToPostgresFor }}
+          labels:
+            severity: warning
+          annotations:
+            summary: "Неожиданные подключения к PostgreSQL"
+            description: "{{ `{{ $labels.source_namespace }}/{{ $labels.source_workload }}{{ $labels.source_app }}` }} пытается подключиться к PostgreSQL и получает отказ политики."
+    - name: shop-order-sla
+      rules:
+        - alert: ShopOrderErrorRateHigh
+          expr: |
+            sum(rate(http_request_duration_seconds_count{namespace="{{ $ns }}",path="/order",status=~"5.."}[2m]))
+            /
+            sum(rate(http_request_duration_seconds_count{namespace="{{ $ns }}",path="/order"}[2m]))
+            > {{ $r.errorRatio }}
+          for: {{ $r.forDuration }}
+          labels:
+            severity: critical
+          annotations:
+            summary: "Доля 5xx на POST /order выше SLA"
+            description: "Ошибок больше {{ $r.errorRatio }} от запросов уже {{ $r.forDuration }}."
+{{- end }}

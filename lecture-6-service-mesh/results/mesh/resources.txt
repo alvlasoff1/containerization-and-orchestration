@@ -1,0 +1,6 @@
+# CPU, millicores (avg over 122s, sum over api pods, by container)
+api	139.3772430272057
+linkerd-proxy	103.16478907571833
+# Memory working set, MiB (sum over api pods, by container)
+api	16.162977430555557
+linkerd-proxy	9.746690538194445

@@ -1,0 +1,17 @@
+# Сниффер в сетевом namespace ноды (hostNetwork): tcpdump видит трафик,
+# который приходит в veth api-pod'а — то есть то, что идёт «по проводу».
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sniffer
+  namespace: lab6-mesh
+spec:
+  nodeName: NODE
+  hostNetwork: true
+  containers:
+    - name: tcpdump
+      image: nicolaka/netshoot:v0.13
+      command: ["sleep", "infinity"]
+      securityContext:
+        capabilities:
+          add: ["NET_ADMIN", "NET_RAW"]
