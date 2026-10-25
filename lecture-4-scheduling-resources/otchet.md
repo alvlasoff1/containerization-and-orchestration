@@ -2,7 +2,7 @@
 
 podAntiAffinity и topologySpreadConstraints определяют правила по которым scheduler выбирает ноду для заселения пода, первый позволяет задать параметры пода который не должен находится рядом с планируемым, второй дает возможность указать распределение некоторого набора подов (по лейблам), а также возможную разницу в этом распределении. Например поды api и worker можно настроить таким образом чтобы они не оказывались на одной ноде с помощью podAntiAffinity, а через topologySpreadConstraints задать, чтобы разница в количестве подов api на нодах не превышала одного. 
 
-В данном случае, поскольку количество реплик мало, то для равномерного распределения по нодам можно использовать podAntiAffinity.
+В этом случае, поскольку количество реплик мало, то для равномерного распределения по нодам можно использовать podAntiAffinity.
 
 ## Часть 2
 
@@ -20,7 +20,7 @@ POST /order — 300 запросов
 
 ![part_3_load.png](part_3_load.png).
 
-После этого включил в Prometheus сбор cAdvisor и kube-state-metrics и запустил `krr` для namespace `lab3-control-plane`. Отчёт сохранён в [krr-report.yaml](krr-report.yaml), снимок вывода — [part_3_krr.png](part_3_krr.png).
+После этого включил в Prometheus сбор cAdvisor и kube-state-metrics и запустил `krr` для namespace `lab3-control-plane`. Отчёт сохранён в [krr-report.yaml](krr-report.yaml), снимок вывода: [part_3_krr.png](part_3_krr.png).
 
 Рекомендации `krr`:
 
@@ -34,13 +34,13 @@ POST /order — 300 запросов
 
 Значения перенесены в `lecture-3-kubernetes-control-plane/shop/values.yaml`. Первая попытка `helm upgrade` завершилась по timeout: на сервере была одна нода, а обязательный `podAntiAffinity` не позволил временно разместить новую ReplicaSet. Это показано на рисунке [part_3_upgrade_blocked.png](part_3_upgrade_blocked.png).
 
-После добавления второй worker-ноды upgrade был завершён успешно. Для rollout также задано `maxUnavailable: 1`, потому что при обязательном anti-affinity старую ReplicaSet нужно сначала уменьшить, чтобы новая реплика смогла занять освободившуюся ноду.
+После добавления второй worker-ноды upgrade завершился успешно. Для rollout также задано `maxUnavailable: 1`, потому что при обязательном anti-affinity старую ReplicaSet нужно сначала уменьшить, чтобы новая реплика смогла занять освободившуюся ноду.
 
 ## Часть 4 — Распределение API по нодам
 
 Для `api` используется `podAntiAffinity` с `topologyKey: kubernetes.io/hostname`. Это запрещает размещать две реплики API на одной ноде.
 
-Проверка выполнена командой:
+Проверил командой:
 
 ```bash
 kubectl get pods -n lab3-control-plane -l app.kubernetes.io/component=api -o wide
@@ -50,7 +50,7 @@ kubectl get pods -n lab3-control-plane -l app.kubernetes.io/component=api -o wid
 
 Вторая worker-нода запущена как отдельный k3s-agent контейнер на той же ВМ. Для Kubernetes это отдельная нода с отдельным hostname, но физически обе ноды зависят от одной ВМ.
 
-Таким образом, правило anti-affinity применилось: scheduler не разместил две реплики `api` на одной ноде. При отказе одной Kubernetes-ноды вторая реплика остаётся на другой ноде.
+Правило anti-affinity применилось: scheduler не разместил две реплики `api` на одной ноде. При отказе одной Kubernetes-ноды вторая реплика остаётся на другой ноде.
 
 ## Часть 5 — Приоритеты, QoS и PDB
 
@@ -66,11 +66,11 @@ kubectl get pods -n lab3-control-plane -l app.kubernetes.io/component=api -o wid
 - `api`: CPU `10m`, memory `100Mi`;
 - `postgres`: CPU `100m`, memory `256Mi`.
 
-Поэтому эти pod’ы относятся к QoS `Guaranteed`. Для `batch` requests меньше limits: CPU `100m`/`2`, memory `100Mi`/`256Mi`. Его QoS — `Burstable`.
+Поэтому эти pod’ы относятся к QoS `Guaranteed`. Для `batch` requests меньше limits: CPU `100m`/`2`, memory `100Mi`/`256Mi`. Его QoS: `Burstable`.
 
 Добавлены PDB `shop-api` и `shop-postgres-pdb` с `minAvailable: 1`. Для PostgreSQL также остаётся PDB `shop-postgres-primary`, который создаётся оператором CloudNativePG.
 
-После `helm upgrade` `api` имеет priority `100000` и QoS `Guaranteed`, `batch` — priority `100` и QoS `Burstable`, а новый PostgreSQL pod получил priority `100000` и QoS `Guaranteed`. После штатного restart CloudNativePG кластер вернулся в состояние `Cluster in healthy state`.
+После `helm upgrade` `api` имеет priority `100000` и QoS `Guaranteed`, `batch` имеет priority `100` и QoS `Burstable`, а новый PostgreSQL pod получил priority `100000` и QoS `Guaranteed`. После штатного restart CloudNativePG кластер вернулся в состояние `Cluster in healthy state`.
 
 Результат проверки показан на рисунке [part_5_priority_pdb.png](part_5_priority_pdb.png).
 
@@ -78,7 +78,7 @@ PDB ограничивает добровольные disruption’ы и не з
 
 ## Часть 6 — Дефицит, Pending и preemption
 
-Чтобы получить нехватку ресурсов малым числом pod’ов, увеличил не только `batch.replicaCount`, но и request на одну реплику. Значения в `values.yaml`:
+Чтобы получить нехватку ресурсов малым числом pod’ов, увеличил и `batch.replicaCount`, и request на одну реплику. Значения в `values.yaml`:
 
 - `replicaCount: 3`;
 - requests: CPU `500m`, memory `4000Mi`;
@@ -108,7 +108,7 @@ PDB ограничивает добровольные disruption’ы и не з
 
 Критичный путь не пострадал: `api` и `postgres` остались `Running`. До `batch` kubelet также выселил несколько BestEffort pod’ов из `lab2-observability` (у них request равен 0). Это соответствует порядку eviction: сначала pod’ы без requests и использующие память сверх requests, затем по приоритету. `batch` попал в выселяемые раньше `api` и `postgres`, потому что у него ниже приоритет и он превысил requests, тогда как у `Guaranteed` pod’ов использование не выходит за requests.
 
-Отличие от `OOMKilled`: eviction — решение kubelet на уровне ноды, когда на ней не хватает памяти; он выбирает pod по QoS, превышению requests и приоритету, а в событии есть причина `The node was low on resource: memory`. `OOMKilled` — решение ядра на уровне контейнера, когда он превысил собственный memory limit; в статусе контейнера `Reason: OOMKilled`, `Exit Code: 137`. Внешне оба случая выглядят как исчезновение или перезапуск pod’а, но диагноз разный: в первом случае не хватает памяти на ноде и нужно смотреть requests и приоритеты, во втором слишком мал limit самого контейнера.
+Отличие от `OOMKilled`: eviction это решение kubelet на уровне ноды, когда на ней не хватает памяти; он выбирает pod по QoS, превышению requests и приоритету, а в событии есть причина `The node was low on resource: memory`. `OOMKilled` это решение ядра на уровне контейнера, когда он превысил собственный memory limit; в статусе контейнера `Reason: OOMKilled`, `Exit Code: 137`. Внешне оба случая выглядят как исчезновение или перезапуск pod’а, но диагноз разный: в первом случае не хватает памяти на ноде и нужно смотреть requests и приоритеты, во втором слишком мал limit самого контейнера.
 
 ## Часть 8 — SLA критичного пути под нагрузкой
 
@@ -116,7 +116,7 @@ PDB ограничивает добровольные disruption’ы и не з
 
 Нагрузка: pod `williamyeh/hey` внутри кластера, 10 соединений по 10 запросов в секунду, около 100 RPS, `POST /order` на сервис `shop-api`.
 
-**Подготовка.** Первый прогон без `batch` SLA не прошёл: p95 составил 1.61 с при 20.8 RPS. Причина — CPU throttling: у `api` limit `10m`, у `postgres` `100m` (значения requests = limits из части 5), и по метрикам cAdvisor они упирались в квоту в 86–98% периодов. Для `api` CPU request `krr` посчитал по лёгкой нагрузке части 3, а Guaranteed-QoS превратил его в жёсткий потолок. Подобрал значения вручную, оставив requests = limits:
+**Подготовка.** Первый прогон без `batch` SLA не прошёл: p95 составил 1.61 с при 20.8 RPS. Причина в CPU throttling: у `api` limit `10m`, у `postgres` `100m` (значения requests = limits из части 5), и по метрикам cAdvisor они упирались в квоту в 86–98% периодов. Для `api` CPU request `krr` посчитал по лёгкой нагрузке части 3, а Guaranteed-QoS превратил его в жёсткий потолок. Подобрал значения вручную, оставив requests = limits:
 
 - `api`: CPU `250m`;
 - `postgres`: CPU `1000m`.
@@ -152,6 +152,6 @@ PDB ограничивает добровольные disruption’ы и не з
 2. **`ShopOrderErrorRateHigh`** — доля ответов 5xx на `/order` выше `1%` в течение `1m`, severity `critical`. Вторая половина SLA: ошибки.
 3. **`ShopApiCpuThrottling`** — throttling `api` больше `25%` периодов в течение `2m`, severity `warning`. Это ранний сигнал: именно throttling (86–98% при limit `10m`) сломал базовую линию в части 8, и он появляется раньше, чем p95 выйдет за SLA. Подробнее: limit CPU слишком мал для нагрузки.
 
-Первые два алерта следят за тем, что обещано пользователю, третий — за причиной, по которой критичный путь может деградировать при Guaranteed-QoS.
+Первые два алерта следят за тем, что обещано пользователю, а третий за причиной, по которой критичный путь может деградировать при Guaranteed-QoS.
 
 **Проверка срабатывания.** При нагрузке около 870 RPS (`hey -c 60 -q 20`) p95 был 0.167 с, ниже порога 0.3 с, и ни один алерт не сработал, то есть запас по нагрузке почти девятикратный. Чтобы показать срабатывание, порог `ShopOrderLatencyP95High` временно понизил до `0.1` с (`--set monitoring.prometheusRule.latencyP95Seconds=0.1`) и повторил нагрузку. Алерт перешёл в `pending`, а через минуту (`for: 1m`) в `firing` со значением 0.1747 с. Остальные два остались `inactive`. Результат на рисунке [part-9.png](images/part-9.png). После проверки порог возвращается к `0.3`.
